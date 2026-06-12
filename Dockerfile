@@ -25,8 +25,14 @@ ENV OPAMROOT=/opt/opam \
 # stubs, plus common -dev libraries that opam packages depexts depend on
 # (gmp -> zarith, ffi -> ctypes, etc.). opam will apt-get install any further
 # depexts itself during `opam install`.
+# autoconf/automake/which are required by the OxCaml compiler's conf-* depexts.
+# We deliberately keep the apt package lists (no `rm`) so that opam's depext
+# mechanism can apt-get install any further system packages the dependency
+# tree needs during `opam install` below.
 RUN apt-get update \
     && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+        autoconf \
+        automake \
         build-essential \
         ca-certificates \
         curl \
@@ -39,8 +45,8 @@ RUN apt-get update \
         pkg-config \
         rsync \
         unzip \
-        zlib1g-dev \
-    && rm -rf /var/lib/apt/lists/*
+        which \
+        zlib1g-dev
 
 # Install a pinned opam binary (same version setup-ocaml used).
 RUN curl -fsSL \
