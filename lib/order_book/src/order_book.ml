@@ -71,13 +71,9 @@ let find_match t incoming =
   let incoming_side = Order.side incoming in
   let opposite_side = Side.flip incoming_side in
   let resting_orders = side_list t opposite_side in
-  let is_marketable ~price ~resting_price =
-    match (incoming_side : Side.t) with
-    | Buy -> Price.( >= ) price resting_price
-    | Sell -> Price.( <= ) price resting_price
-  in
   List.find resting_orders ~f:(fun resting ->
-    is_marketable
+    Price.is_marketable
+      incoming_side
       ~price:(Order.price incoming)
       ~resting_price:(Order.price resting))
 ;;
@@ -87,16 +83,9 @@ let is_empty t = List.is_empty t.bids && List.is_empty t.asks
 let count t side = List.length (side_list t side)
 
 let best_price t side =
-  match side_list t side with
-  | [] -> None
-  | first :: rest ->
-    let is_better =
-      match (side : Side.t) with Buy -> Price.( > ) | Sell -> Price.( < )
-    in
-    Some
-      (List.fold rest ~init:(Order.price first) ~f:(fun best order ->
-         let price = Order.price order in
-         if is_better price best then price else best))
+  let priceList = List.map (side_list t side) ~f:Order.price in
+  List.reduce priceList ~f:(fun best price ->
+    if Price.is_more_aggressive side ~price ~than:best then price else best)
 ;;
 
 let best_level t side : Level.t option =
