@@ -13,11 +13,7 @@ type verb =
   | Subscribe
 [@@deriving string ~case_insensitive ~capitalize:"SCREAMING_SNAKE_CASE"]
 
-(** Split the line on spaces, take the first word. Parse it as a Verb.t. If
-    it fails, return Error. Match on the verb to parse the remaining
-    arguments: Buy | Sell: parse symbol, size, price, time-in-force,
-    participant (move this logic from Protocol.parse_command). Book |
-    Subscribe: parse a required symbol argument. *)
+(*explain*)
 let parse ?default_participant:participant line =
   let line_stripped = String.strip line |> String.filter ~f:(fun c -> not (Char.equal c '\n')) in
   if String.is_empty line_stripped

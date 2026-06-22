@@ -82,7 +82,7 @@ Continue entering commands as normal.|}];
              don't_wait_for
                (Pipe.iter_without_pushback reader ~f:(fun event ->
                   print_endline
-                    [%string "[MD] %{Protocol.format_event event}"]));
+                    [%string "[MD] %{Event_formatter.format_event event}"]));
              loop ()))
   in
   loop ()

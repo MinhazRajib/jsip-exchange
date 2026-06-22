@@ -175,7 +175,7 @@ let%expect_test "round-trip: parse a command, submit, format result" =
       print_endline [%string "ERROR: %{Error.to_string_hum msg}"]
     | Ok (Exchange_command.Submit request) ->
       let events = Matching_engine.submit (Harness.engine t) request in
-      print_endline (Protocol.format_events events)
+      print_endline (Event_formatter.format_events events)
     | Ok _ -> print_endline "WRONG COMMAND"
   in
   [%expect

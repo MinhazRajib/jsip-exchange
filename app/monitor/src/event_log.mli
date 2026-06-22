@@ -96,7 +96,7 @@ val filter : t -> Filter.t
 (** Visible events in insertion order (oldest first). *)
 val visible_events : t -> Exchange_event.t list
 
-(** Visible events rendered as text via [Protocol.format_event]. *)
+(** Visible events rendered as text via [Format.format_event]. *)
 val visible_lines : t -> string list
 
 (** Visible events rendered as [(Color.t, line)] pairs, ready for a styled
