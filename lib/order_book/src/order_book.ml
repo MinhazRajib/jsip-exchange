@@ -1,6 +1,5 @@
 open! Core
 open Jsip_types
-open Async_log_kernel.Ppx_log_syntax
 
 module Price_id_key = struct
   type t =
@@ -165,10 +164,10 @@ let snapshot_side t (side : Side.t) =
     let price = level1.price in
     let than = level2.price in
     if Price.is_more_aggressive side ~price ~than
-    then 1 (* higher precedence *)
+    then -1 (* higher precedence *)
     else if Price.( = ) price than
     then 0
-    else -1
+    else 1
   in
   orders_on_side t side |> List.map ~f:Level.of_order |> List.sort ~compare
 ;;

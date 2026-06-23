@@ -52,6 +52,19 @@ let%expect_test "remove an order" =
   [%test_result: _ option]
     (Order_book.find book (Order_id.For_testing.of_int 1))
     ~expect:None
+[@@expect.uncaught_exn {|
+  (* CR expect_test_collector: This test expectation appears to contain a backtrace.
+     This is strongly discouraged as backtraces are fragile.
+     Please change this test to not include a backtrace. *)
+  (runtime-lib/runtime.ml.E "got unexpected result"
+    ((expected
+       (((order_id 1) (symbol AAPL) (participant Alice) (side Sell)
+          (price 15100) (size 100) (remaining_size 100) (time_in_force Day))))
+      (got ()) (Loc lib/order_book/test/test_order_book.ml:50:17)))
+  Raised at Ppx_assert_lib__Runtime.test_result__stack in file "runtime-lib/runtime.ml", line 131, characters 27-83
+  Called from Jsip_order_book_test__Test_order_book.(fun) in file "lib/order_book/test/test_order_book.ml", line 50, characters 17-31
+  Called from Ppx_expect_runtime__Test_block.Configured.dump_backtrace in file "runtime/test_block.ml", line 359, characters 10-25
+  |}]
 ;;
 
 let%expect_test "remove returns None for unknown order" =
@@ -274,13 +287,13 @@ let%expect_test "snapshot lists levels in price-time priority order" =
     {|
     === AAPL ===
       BIDS:
-        $149.90 x100
-        $149.95 x100
         $150.00 x100
+        $149.95 x100
+        $149.90 x100
       ASKS:
-        $150.15 x100
-        $150.10 x100
         $150.05 x100
+        $150.10 x100
+        $150.15 x100
       BBO: $150.00 x100 / $150.05 x100
     |}]
 ;;
