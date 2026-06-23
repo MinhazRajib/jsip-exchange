@@ -71,12 +71,29 @@ let find_match t incoming =
   let incoming_side = Order.side incoming in
   let opposite_side = Side.flip incoming_side in
   let resting_orders = side_list t opposite_side in
-  List.find resting_orders ~f:(fun resting ->
-    Price.is_marketable
-      incoming_side
-      ~price:(Order.price incoming)
-      ~resting_price:(Order.price resting))
+  let marketable =
+    List.filter resting_orders ~f:(fun resting ->
+      Price.is_marketable
+        incoming_side
+        ~price:(Order.price incoming)
+        ~resting_price:(Order.price resting))
+  in
+  match marketable with
+  | [] -> None
+  | first :: rest ->
+    Some
+      (List.fold rest ~init:first ~f:(fun previous_best next_order ->
+         if Price.is_more_aggressive
+              opposite_side
+              ~price:(Order.price next_order)
+              ~than:(Order.price previous_best)
+         then next_order
+         else previous_best))
 ;;
+
+(* List.find resting_orders ~f:(fun resting -> Price.is_marketable
+   incoming_side ~price:(Order.price incoming) ~resting_price:(Order.price
+   resting)) ;; *)
 
 let orders_on_side t side = side_list t side
 let is_empty t = List.is_empty t.bids && List.is_empty t.asks
@@ -105,14 +122,38 @@ let best_bid_offer t : Bbo.t =
   { bid = best_level t Buy; ask = best_level t Sell }
 ;;
 
+(* Update snapshot_side so the snapshot lists levels in the same order that
+   matching would visit them: bids highest-price-first, asks
+   lowest-price-first, with ties broken by arrival time. The snapshot is what
+   clients see when they query the book, so it should reflect the real
+   matching order rather than insertion order. Update the expect output in
+   the affected tests, including the price For snapshot_side: the current
+   code maps orders to Level.t ([{ price; size }]) and sorts them with
+   Level.compare, which only knows about price and size — it has no notion of
+   arrival time. Sort the underlying Order.t list first, with a comparator
+   built from Price.is_more_aggressive and Order_id.compare (lower order ID =
+   arrived first), then map to Level.t. That keeps the snapshot c onsistent
+   with the matching order. *)
+
 let snapshot_side t (side : Side.t) =
-  let compare =
-    match side with
-    | Buy -> Comparable.reverse Level.compare
-    | Sell -> Level.compare
+  let orders = side_list t side in
+  let sorted_orders =
+    List.sort orders ~compare:(fun a b ->
+      if Price.is_more_aggressive
+           side
+           ~price:(Order.price a)
+           ~than:(Order.price b)
+      then -1
+      else if Price.equal (Order.price a) (Order.price b)
+      then Order_id.compare (Order.order_id a) (Order.order_id b)
+      else 1)
   in
-  orders_on_side t side |> List.map ~f:Level.of_order |> List.sort ~compare
+  List.map sorted_orders ~f:Level.of_order
 ;;
+
+(* let compare = match side with | Buy -> Comparable.reverse Level.compare |
+   Sell -> Level.compare in orders_on_side t side |> List.map
+   ~f:Level.of_order |> List.sort ~compare *)
 
 let snapshot t =
   { Book.symbol = symbol t

@@ -29,13 +29,16 @@ let ( - ) = Int.( - )
 let ( * ) price qty = price * qty
 
 let is_more_aggressive side ~price ~than =
-  match side with Side.Buy -> price > than | Side.Sell -> price < than
+  match side with
+  | Side.Buy -> price > than
+  | Sell -> price < than (* no need for Side. because type inference *)
 ;;
 
 let is_marketable side ~price ~resting_price =
   match side with
   | Side.Buy -> price >= resting_price
-  | Side.Sell -> price <= resting_price
+  | Sell ->
+    price <= resting_price (* no need for Side. because type inference *)
 ;;
 
 let to_string_dollar t =
