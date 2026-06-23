@@ -40,3 +40,33 @@ let to_string
 ;;
 
 let notional_cents t = Price.to_int_cents t.price * Size.to_int t.size
+
+let to_participant_view t participant =
+  if Participant.( <> ) t.aggressor_participant participant
+     && Participant.( <> ) t.resting_participant participant
+  then None
+  else (
+    let side =
+      match Participant.( = ) t.aggressor_participant participant with
+      | true -> t.aggressor_side
+      | false ->
+        (match t.aggressor_side with
+         | Side.Buy -> Side.Sell
+         | Side.Sell -> Side.Buy)
+    in
+    match side with
+    | Buy ->
+      Some
+        (sprintf
+           "You bought %d %s at %s"
+           (Size.to_int t.size)
+           (Symbol.to_string t.symbol)
+           (Price.to_string_dollar t.price))
+    | Sell ->
+      Some
+        (sprintf
+           "You sold %d %s at %s"
+           (Size.to_int t.size)
+           (Symbol.to_string t.symbol)
+           (Price.to_string_dollar t.price)))
+;;
