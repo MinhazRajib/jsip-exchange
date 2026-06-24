@@ -57,3 +57,8 @@ val dispatch : t -> Exchange_event.t list -> unit
 module For_testing : sig
   val audit_subscriber_count : t -> int
 end
+
+(** Sets up session registry on dispatcher and handles cleanup *)
+(* val clean_up_session : t -> Session.t -> unit Deferred.t
+
+   val set_up_session : t -> Participant.t -> unit Deferred.t *)
