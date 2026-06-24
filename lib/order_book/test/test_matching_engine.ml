@@ -70,30 +70,22 @@ let%expect_test "partial fill: buy is larger than resting sell" =
     t
     (Harness.sell ~price_cents:15000 ~size:60 ~participant:Harness.bob ());
   submit_ t (Harness.buy ~price_cents:15000 ~size:100 ());
-  [%expect.unreachable];
+  [%expect
+    {|
+    ACCEPTED id=1 AAPL SELL 60@$150.00 DAY
+    ACCEPTED id=2 AAPL BUY 100@$150.00 DAY
+    FILL fill_id=1 AAPL $150.00 x60 aggressor=2(Alice) BUY resting=1(Bob)
+    |}];
   (* Remainder rests on the book *)
   Harness.print_book t Harness.aapl;
-  [%expect.unreachable]
-[@@expect.uncaught_exn {|
-  (* CR expect_test_collector: This test expectation appears to contain a backtrace.
-     This is strongly discouraged as backtraces are fragile.
-     Please change this test to not include a backtrace. *)
-  ("Order.fill: fill size must be positive" (by 0))
-  Raised at Base__Error.raise in file "src/error.ml", line 17, characters 38-66
-  Called from Base__Error.raise_s in file "src/error.ml" (inlined), line 26, characters 52-76
-  Called from Jsip_types__Order.fill in file "lib/types/src/order.ml", line 82, characters 4-77
-  Called from Jsip_order_book__Matching_engine.match_loop in file "lib/order_book/src/matching_engine.ml", line 34, characters 6-36
-  Called from Jsip_order_book__Matching_engine.match_loop in file "lib/order_book/src/matching_engine.ml", line 59, characters 8-54
-  Called from Jsip_order_book__Matching_engine.submit in file "lib/order_book/src/matching_engine.ml", line 76, characters 6-53
-  Called from Jsip_order_book_test__Test_matching_engine.submit in file "lib/order_book/test/test_matching_engine.ml", line 9, characters 15-64
-  Called from Jsip_order_book_test__Test_matching_engine.submit_ in file "lib/order_book/test/test_matching_engine.ml" (inlined), line 14, characters 32-48
-  Called from Jsip_order_book_test__Test_matching_engine.(fun) in file "lib/order_book/test/test_matching_engine.ml", line 72, characters 2-57
-  Called from Ppx_expect_runtime__Test_block.Configured.dump_backtrace in file "runtime/test_block.ml", line 359, characters 10-25
-
-  Trailing output
-  ---------------
-  ACCEPTED id=1 AAPL SELL 60@$150.00 DAY
-  |}]
+  [%expect
+    {|
+    === AAPL ===
+      BIDS:
+        $150.00 x40
+      ASKS: (empty)
+      BBO: $150.00 x40 / -
+    |}]
 ;;
 
 let%expect_test "aggressor sweeps multiple resting orders" =
@@ -109,28 +101,14 @@ let%expect_test "aggressor sweeps multiple resting orders" =
        ~participant:Harness.charlie
        ());
   submit_ t (Harness.buy ~price_cents:15000 ~size:100 ());
-  [%expect.unreachable]
-[@@expect.uncaught_exn {|
-  (* CR expect_test_collector: This test expectation appears to contain a backtrace.
-     This is strongly discouraged as backtraces are fragile.
-     Please change this test to not include a backtrace. *)
-  ("Order.fill: fill size must be positive" (by 0))
-  Raised at Base__Error.raise in file "src/error.ml", line 17, characters 38-66
-  Called from Base__Error.raise_s in file "src/error.ml" (inlined), line 26, characters 52-76
-  Called from Jsip_types__Order.fill in file "lib/types/src/order.ml", line 82, characters 4-77
-  Called from Jsip_order_book__Matching_engine.match_loop in file "lib/order_book/src/matching_engine.ml", line 34, characters 6-36
-  Called from Jsip_order_book__Matching_engine.match_loop in file "lib/order_book/src/matching_engine.ml", line 59, characters 8-54
-  Called from Jsip_order_book__Matching_engine.submit in file "lib/order_book/src/matching_engine.ml", line 76, characters 6-53
-  Called from Jsip_order_book_test__Test_matching_engine.submit in file "lib/order_book/test/test_matching_engine.ml", line 9, characters 15-64
-  Called from Jsip_order_book_test__Test_matching_engine.submit_ in file "lib/order_book/test/test_matching_engine.ml" (inlined), line 14, characters 32-48
-  Called from Jsip_order_book_test__Test_matching_engine.(fun) in file "lib/order_book/test/test_matching_engine.ml", line 103, characters 2-57
-  Called from Ppx_expect_runtime__Test_block.Configured.dump_backtrace in file "runtime/test_block.ml", line 359, characters 10-25
-
-  Trailing output
-  ---------------
-  ACCEPTED id=1 AAPL SELL 50@$150.00 DAY
-  ACCEPTED id=2 AAPL SELL 80@$150.00 DAY
-  |}]
+  [%expect
+    {|
+    ACCEPTED id=1 AAPL SELL 50@$150.00 DAY
+    ACCEPTED id=2 AAPL SELL 80@$150.00 DAY
+    ACCEPTED id=3 AAPL BUY 100@$150.00 DAY
+    FILL fill_id=1 AAPL $150.00 x50 aggressor=3(Alice) BUY resting=1(Bob)
+    FILL fill_id=2 AAPL $150.00 x50 aggressor=3(Alice) BUY resting=2(Charlie)
+    |}]
 ;;
 
 (* ================================================================ *)
@@ -153,27 +131,13 @@ let%expect_test "IOC: partial fill then cancel remainder" =
     t
     (Harness.sell ~price_cents:15000 ~size:40 ~participant:Harness.bob ());
   submit_ t (Harness.buy ~price_cents:15000 ~size:100 ~time_in_force:Ioc ());
-  [%expect.unreachable]
-[@@expect.uncaught_exn {|
-  (* CR expect_test_collector: This test expectation appears to contain a backtrace.
-     This is strongly discouraged as backtraces are fragile.
-     Please change this test to not include a backtrace. *)
-  ("Order.fill: fill size must be positive" (by 0))
-  Raised at Base__Error.raise in file "src/error.ml", line 17, characters 38-66
-  Called from Base__Error.raise_s in file "src/error.ml" (inlined), line 26, characters 52-76
-  Called from Jsip_types__Order.fill in file "lib/types/src/order.ml", line 82, characters 4-77
-  Called from Jsip_order_book__Matching_engine.match_loop in file "lib/order_book/src/matching_engine.ml", line 34, characters 6-36
-  Called from Jsip_order_book__Matching_engine.match_loop in file "lib/order_book/src/matching_engine.ml", line 59, characters 8-54
-  Called from Jsip_order_book__Matching_engine.submit in file "lib/order_book/src/matching_engine.ml", line 76, characters 6-53
-  Called from Jsip_order_book_test__Test_matching_engine.submit in file "lib/order_book/test/test_matching_engine.ml", line 9, characters 15-64
-  Called from Jsip_order_book_test__Test_matching_engine.submit_ in file "lib/order_book/test/test_matching_engine.ml" (inlined), line 14, characters 32-48
-  Called from Jsip_order_book_test__Test_matching_engine.(fun) in file "lib/order_book/test/test_matching_engine.ml", line 133, characters 2-76
-  Called from Ppx_expect_runtime__Test_block.Configured.dump_backtrace in file "runtime/test_block.ml", line 359, characters 10-25
-
-  Trailing output
-  ---------------
-  ACCEPTED id=1 AAPL SELL 40@$150.00 DAY
-  |}]
+  [%expect
+    {|
+    ACCEPTED id=1 AAPL SELL 40@$150.00 DAY
+    ACCEPTED id=2 AAPL BUY 100@$150.00 IOC
+    FILL fill_id=1 AAPL $150.00 x40 aggressor=2(Alice) BUY resting=1(Bob)
+    CANCELLED id=2 AAPL remaining=60 reason=IOC_REMAINDER
+    |}]
 ;;
 
 let%expect_test "IOC: full fill means no cancel event" =
@@ -311,7 +275,7 @@ let%expect_test "BBO update: reflects new best after fill" =
   let events = Harness.submit_quiet t (Harness.buy ~price_cents:15000 ()) in
   Harness.print_events ~show:show_bbo events;
   (* Both sides empty after the cross *)
-  [%expect {| BBO AAPL bid=- ask=$150.00 x0 |}]
+  [%expect {| BBO AAPL bid=- ask=- |}]
 ;;
 
 let%expect_test "BBO update: not emitted when BBO unchanged" =
@@ -355,21 +319,10 @@ let%expect_test "trade report emitted for each fill" =
         | Exchange_event.Trade_report _ -> true
         | _ -> false))
     events;
-  [%expect.unreachable]
-[@@expect.uncaught_exn {|
-  (* CR expect_test_collector: This test expectation appears to contain a backtrace.
-     This is strongly discouraged as backtraces are fragile.
-     Please change this test to not include a backtrace. *)
-  ("Order.fill: fill size must be positive" (by 0))
-  Raised at Base__Error.raise in file "src/error.ml", line 17, characters 38-66
-  Called from Base__Error.raise_s in file "src/error.ml" (inlined), line 26, characters 52-76
-  Called from Jsip_types__Order.fill in file "lib/types/src/order.ml", line 82, characters 4-77
-  Called from Jsip_order_book__Matching_engine.match_loop in file "lib/order_book/src/matching_engine.ml", line 34, characters 6-36
-  Called from Jsip_order_book__Matching_engine.match_loop in file "lib/order_book/src/matching_engine.ml", line 59, characters 8-54
-  Called from Jsip_order_book__Matching_engine.submit in file "lib/order_book/src/matching_engine.ml", line 76, characters 6-53
-  Called from Jsip_order_book_test__Test_matching_engine.(fun) in file "lib/order_book/test/test_matching_engine.ml", line 314, characters 4-72
-  Called from Ppx_expect_runtime__Test_block.Configured.dump_backtrace in file "runtime/test_block.ml", line 359, characters 10-25
-  |}]
+  [%expect {|
+    TRADE AAPL $150.00 x50
+    TRADE AAPL $150.00 x50
+    |}]
 ;;
 
 let%expect_test "no market data events on rejection" =
@@ -418,11 +371,11 @@ let%expect_test "scenario: two participants trade, book reflects state" =
     FILL fill_id=1 AAPL $150.10 x50 aggressor=5(Charlie) BUY resting=3(Bob)
     === AAPL ===
       BIDS:
-        $149.90 x100
         $149.80 x200
+        $149.90 x100
       ASKS:
-        $150.10 x50
         $150.20 x150
+        $150.10 x50
       BBO: $149.90 x100 / $150.10 x50
     BBO AAPL: $149.90 x100 / $150.10 x50
     |}]
@@ -446,29 +399,21 @@ let%expect_test "scenario: aggressive IOC sweeps entire book" =
   (* IOC buy for 200 at $150.20 — sweeps all 150 shares, cancels 50 *)
   submit_ t (Harness.buy ~price_cents:15020 ~size:200 ~time_in_force:Ioc ());
   Harness.print_book t Harness.aapl;
-  [%expect.unreachable]
-[@@expect.uncaught_exn {|
-  (* CR expect_test_collector: This test expectation appears to contain a backtrace.
-     This is strongly discouraged as backtraces are fragile.
-     Please change this test to not include a backtrace. *)
-  ("Order.fill: fill size must be positive" (by 0))
-  Raised at Base__Error.raise in file "src/error.ml", line 17, characters 38-66
-  Called from Base__Error.raise_s in file "src/error.ml" (inlined), line 26, characters 52-76
-  Called from Jsip_types__Order.fill in file "lib/types/src/order.ml", line 82, characters 4-77
-  Called from Jsip_order_book__Matching_engine.match_loop in file "lib/order_book/src/matching_engine.ml", line 34, characters 6-36
-  Called from Jsip_order_book__Matching_engine.match_loop in file "lib/order_book/src/matching_engine.ml", line 59, characters 8-54
-  Called from Jsip_order_book__Matching_engine.submit in file "lib/order_book/src/matching_engine.ml", line 76, characters 6-53
-  Called from Jsip_order_book_test__Test_matching_engine.submit in file "lib/order_book/test/test_matching_engine.ml", line 9, characters 15-64
-  Called from Jsip_order_book_test__Test_matching_engine.submit_ in file "lib/order_book/test/test_matching_engine.ml" (inlined), line 14, characters 32-48
-  Called from Jsip_order_book_test__Test_matching_engine.(fun) in file "lib/order_book/test/test_matching_engine.ml", line 400, characters 2-76
-  Called from Ppx_expect_runtime__Test_block.Configured.dump_backtrace in file "runtime/test_block.ml", line 359, characters 10-25
-
-  Trailing output
-  ---------------
-  ACCEPTED id=1 AAPL SELL 50@$150.00 DAY
-  ACCEPTED id=2 AAPL SELL 50@$150.10 DAY
-  ACCEPTED id=3 AAPL SELL 50@$150.20 DAY
-  |}]
+  [%expect
+    {|
+    ACCEPTED id=1 AAPL SELL 50@$150.00 DAY
+    ACCEPTED id=2 AAPL SELL 50@$150.10 DAY
+    ACCEPTED id=3 AAPL SELL 50@$150.20 DAY
+    ACCEPTED id=4 AAPL BUY 200@$150.20 IOC
+    FILL fill_id=1 AAPL $150.00 x50 aggressor=4(Alice) BUY resting=1(Bob)
+    FILL fill_id=2 AAPL $150.10 x50 aggressor=4(Alice) BUY resting=2(Charlie)
+    FILL fill_id=3 AAPL $150.20 x50 aggressor=4(Alice) BUY resting=3(Bob)
+    CANCELLED id=4 AAPL remaining=50 reason=IOC_REMAINDER
+    === AAPL ===
+      BIDS: (empty)
+      ASKS: (empty)
+      BBO: - / -
+    |}]
 ;;
 
 let%expect_test "scenario: order IDs are globally sequential" =
