@@ -26,7 +26,7 @@ have touched every layer of the system at least once.
 
 ---
 
-## Exercise 1: Implement `Price.is_more_aggressive` and `Price.is_marketable`
+## ~~Exercise 1: Implement `Price.is_more_aggressive` and `Price.is_marketable`~~
 
 Implement the `is_more_aggressive` and `is_marketable` functions. The first function
 determines whether one price is more aggressive than another from the perspective of a
@@ -67,7 +67,7 @@ for some examples and guidance.
 
 ---
 
-## Exercise 2: Fix price-time priority matching
+## ~~Exercise 2: Fix price-time priority matching~~
 
 The order book currently stores orders in unsorted lists and `find_match`
 returns the first tradable order it encounters, not the best-priced one.
@@ -110,7 +110,7 @@ is broken" demonstrates this bug.
 
 ---
 
-## _Exercise 3: Add symbol validation_ [OPTIONAL]
+## ~~_Exercise 3: Add symbol validation_ [OPTIONAL]~~
 
 `Symbol.of_string` currently accepts any non-empty string. Add validation
 that the symbol contains only uppercase alphanumeric characters.
@@ -137,7 +137,7 @@ invalid symbols (special characters, empty), and your lowercase decision.
 
 ---
 
-## _Exercise 4: Participant-view fills_ [OPTIONAL]
+## ~~_Exercise 4: Participant-view fills_ [OPTIONAL]~~
 
 Add `to_participant_view : t -> Participant.t -> string option` to the `Fill` module.
 
@@ -244,7 +244,7 @@ FOK reason, no fills). If yes, proceed with normal matching.
 
 ---
 
-## Exercise 8: Centralize command parsing
+## ~~Exercise 8: Centralize command parsing~~
 
 As you've seen in last two exercises, implementation of the command-line interface is
 currently split across two places:
@@ -401,7 +401,7 @@ would self-trade.
 
 ---
 
-## Exercise 10: Improve the order book data structure
+## ~~Exercise 10: Improve the order book data structure~~
 
 Replace the plain list with a data structure that maintains price-time
 ordering. The current implementation has $O(n)$ `find_match` and `remove`,
