@@ -41,6 +41,11 @@ val subscribe_market_data
     / admin tools. *)
 val subscribe_audit : t -> Exchange_event.t Pipe.Reader.t
 
+(** setup / remove a session from the participant table in Dispatcher *)
+val clean_up_session : t -> Session.t -> unit Deferred.t
+
+val set_up_session : t -> Participant.t -> unit Deferred.t
+
 (** Route each event to every interested subscriber:
 
     - Every event is pushed to every audit subscriber.
@@ -57,8 +62,3 @@ val dispatch : t -> Exchange_event.t list -> unit
 module For_testing : sig
   val audit_subscriber_count : t -> int
 end
-
-(** Sets up session registry on dispatcher and handles cleanup *)
-(* val clean_up_session : t -> Session.t -> unit Deferred.t
-
-   val set_up_session : t -> Participant.t -> unit Deferred.t *)
