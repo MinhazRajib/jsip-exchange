@@ -61,7 +61,7 @@ let%expect_test "parse: with TIF and participant" =
 
 let%expect_test "parse: symbol is uppercased" =
   print_parse "BUY aapl 100\n   150.00";
-  [%expect {| BUY aapl 100@$150.00 DAY as anonymous |}]
+  [%expect {| BUY AAPL 100@$150.00 DAY as anonymous |}]
 ;;
 
 let%expect_test "parse: extra whitespace is ignored" =
