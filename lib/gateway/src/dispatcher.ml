@@ -129,3 +129,6 @@ let dispatch t events = List.iter events ~f:(dispatch_event t)
 module For_testing = struct
   let audit_subscriber_count t = Bag.length t.audit_subscribers
 end
+
+let valid_participant t participant = Hashtbl.mem t.participants participant
+let get_session t participant = Hashtbl.find t.participants participant

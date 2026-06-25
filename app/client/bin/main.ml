@@ -12,13 +12,14 @@ open Jsip_types
 open Jsip_gateway
 
 let run_client ~host ~port ~participant_name =
-  let participant = Participant.of_string participant_name in
   let where_to_connect =
     Tcp.Where_to_connect.of_host_and_port { host; port }
   in
   let%bind conn = Rpc.Connection.client where_to_connect >>| Result.ok_exn in
-  print_endline
-    [%string
+  (** login to server and dispatch session feed*)
+  let%bind login = Rpc.Rpc.dispatch_exn Rpc_protocol.login_rpc conn participant_name in
+  let participant = Or_error.ok_exn login in
+  print_endline [%string
       {|
   Connected to exchange at %{host}:%{port#Int} as %{participant#Participant}
   Commands: BUY|SELL <symbol> <size> <price> [IOC|DAY]
@@ -28,11 +29,6 @@ let run_client ~host ~port ~participant_name =
   Order acknowledgements, fills, and cancellations are temporarily printed
   by the server process; the SUBSCRIBE command attaches you to a per-symbol
   market-data feed.|}];
-  (** login to server and dispatch session feed*)
-  let%bind login = Rpc.Rpc.dispatch_exn Rpc_protocol.login_rpc conn participant_name in
-  (match login with 
-  | Error msg -> print_endline [%string "ERROR: %{Error.to_string_hum msg}"]
-  | Ok _ -> ());
   let%bind session_feed, _metadata = (Rpc.Pipe_rpc.dispatch_exn Rpc_protocol.session_feed_rpc conn ()) 
   in
   (** dispatch session feed *)

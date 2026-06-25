@@ -62,3 +62,8 @@ val dispatch : t -> Exchange_event.t list -> unit
 module For_testing : sig
   val audit_subscriber_count : t -> int
 end
+
+(** helpers for login *)
+val valid_participant : t -> Participant.t -> bool
+
+val get_session : t -> Participant.t -> Session.t option
