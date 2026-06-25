@@ -64,15 +64,18 @@ let start ~symbols ~port () =
                      (Or_error.error_string
                         "login_rpc: user already logged in")
                  | None ->
-                   (** check if participant already in Dispatch*)
-                   if (Dispatcher.valid_participant dispatcher participant )
-                   then 
-                    let%bind () = Dispatcher.set_up_session dispatcher participant in
-                    state.session <- (Dispatcher.get_session dispatcher participant);
-                    Async.return (Ok participant)
-                  else Async.return
-                     (Or_error.error_string
-                        "login_rpc: user already exists in dispatch")))
+                   if Dispatcher.valid_participant dispatcher participant
+                   then
+                     Async.return
+                       (Or_error.error_string
+                          "login_rpc: user already exists in dispatch")
+                   else (
+                     let%bind () =
+                       Dispatcher.set_up_session dispatcher participant
+                     in
+                     state.session
+                     <- Dispatcher.get_session dispatcher participant;
+                     Async.return (Ok participant))))
         ; Rpc.Rpc.implement
             Rpc_protocol.submit_order_rpc
             (fun state request ->
