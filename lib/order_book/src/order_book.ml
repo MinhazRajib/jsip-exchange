@@ -15,8 +15,7 @@ type t =
   { symbol : Symbol.t
   ; mutable bids : Order.t Price_id_key.Map.t
   ; mutable asks : Order.t Price_id_key.Map.t
-  ; mutable bid_reverse_index : Price_id_key.t Order_id.Map.t
-  ; mutable ask_reverse_index : Price_id_key.t Order_id.Map.t
+  ; mutable reverse_index : Price_id_key.t Order_id.Map.t
   }
 [@@deriving sexp_of]
 
@@ -24,8 +23,7 @@ let create symbol =
   { symbol
   ; bids = Price_id_key.Map.empty
   ; asks = Price_id_key.Map.empty
-  ; bid_reverse_index = Order_id.Map.empty
-  ; ask_reverse_index = Order_id.Map.empty
+  ; reverse_index = Order_id.Map.empty
   }
 ;;
 
@@ -35,16 +33,10 @@ let side_map t side =
   match (side : Side.t) with Buy -> t.bids | Sell -> t.asks
 ;;
 
-let side_reverse_index t side =
-  match (side : Side.t) with
-  | Buy -> t.bid_reverse_index
-  | Sell -> t.ask_reverse_index
-;;
-
-let get_key ?buy order : Price_id_key.t =
-  match buy with
-  | None -> { price = Order.price order; order_id = Order.order_id order }
-  | Some _ ->
+let get_key order : Price_id_key.t =
+  match Order.side order with
+  | Sell -> { price = Order.price order; order_id = Order.order_id order }
+  | Buy ->
     { price =
         Price.( * )
           (Order.price order)
@@ -53,73 +45,60 @@ let get_key ?buy order : Price_id_key.t =
     }
 ;;
 
+let set_reverse_index t (orders : Order.t Price_id_key.Map.t) =
+  let new_reverse_index =
+    Map.mapi t.reverse_index ~f:(fun ~key:_ ~data ->
+      match Map.find orders data with
+      | Some order -> get_key order
+      | None -> data)
+  in
+  t.reverse_index <- new_reverse_index
+;;
+
 let set_side_map t side orders =
+  set_reverse_index t orders;
   match (side : Side.t) with
-  | Buy ->
-    t.bids
-    <- Price_id_key.Map.of_alist_exn
-         (List.map orders ~f:(fun order -> get_key ~buy:true order, order));
-    t.bid_reverse_index
-    <- Order_id.Map.of_alist_exn
-         (List.map orders ~f:(fun order ->
-            Order.order_id order, get_key ~buy:true order))
-  | Sell ->
-    t.asks
-    <- Price_id_key.Map.of_alist_exn
-         (List.map orders ~f:(fun order -> get_key order, order));
-    t.ask_reverse_index
-    <- Order_id.Map.of_alist_exn
-         (List.map orders ~f:(fun order ->
-            Order.order_id order, get_key order))
+  | Buy -> t.bids <- orders
+  | Sell -> t.asks <- orders
 ;;
 
 let set_side_map' t side new_map new_reverse_index =
+  t.reverse_index <- new_reverse_index;
   match (side : Side.t) with
-  | Buy ->
-    t.bids <- new_map;
-    t.bid_reverse_index <- new_reverse_index
-  | Sell ->
-    t.asks <- new_map;
-    t.ask_reverse_index <- new_reverse_index
+  | Buy -> t.bids <- new_map
+  | Sell -> t.asks <- new_map
 ;;
 
 let add t order =
   let side = Order.side order in
-  let new_side_list = order :: Map.data (side_map t side) in
-  set_side_map t side new_side_list
+  let side_map = side_map t side in
+  let new_side_map = Map.add_exn side_map ~key:(get_key order) ~data:order in
+  set_side_map t side new_side_map
 ;;
 
 let remove' t order_id =
   let remove_from t side key =
     let orders = side_map t side in
-    let new_reverse_index =
-      Map.remove (side_reverse_index t side) order_id
-    in
+    let new_reverse_index = Map.remove t.reverse_index order_id in
     let new_side_map = Map.remove orders key in
     set_side_map' t side new_side_map new_reverse_index;
     Map.find orders key
   in
-  match Map.find t.bid_reverse_index order_id with
-  | Some bid_key -> remove_from t Side.Buy bid_key
-  | None ->
-    (match Map.find t.ask_reverse_index order_id with
-     | Some ask_key -> remove_from t Side.Sell ask_key
-     | None -> None)
+  match Map.find t.reverse_index order_id with
+  | Some key ->
+    (match Map.find t.asks key with
+     | Some _ -> remove_from t Side.Sell key
+     | None -> remove_from t Side.Buy key)
+  | None -> None
 ;;
 
 let remove t order_id = ignore (remove' t order_id : Order.t option)
 
 let find t order_id =
   let find_in side =
-    match side with
-    | Side.Buy ->
-      (match Map.find t.bid_reverse_index order_id with
-       | Some key -> Map.find (side_map t side) key
-       | None -> None)
-    | Side.Sell ->
-      (match Map.find t.ask_reverse_index order_id with
-       | Some key -> Map.find (side_map t side) key
-       | None -> None)
+    match Map.find t.reverse_index order_id with
+    | Some key -> Map.find (side_map t side) key
+    | None -> None
   in
   match find_in Buy with Some _ as result -> result | None -> find_in Sell
 ;;
