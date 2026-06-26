@@ -38,6 +38,7 @@ val to_string : t -> string
 val create : Request.t -> order_id:Order_id.t -> t
 
 (** {2 Accessors} *)
+val client_order_id : t -> Client_order_id.t
 
 val order_id : t -> Order_id.t
 val symbol : t -> Symbol.t

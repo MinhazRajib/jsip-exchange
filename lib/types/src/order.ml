@@ -32,7 +32,8 @@ module Request = struct
 end
 
 type t =
-  { order_id : Order_id.t
+  { client_order_id : Client_order_id.t
+  ; order_id : Order_id.t
   ; symbol : Symbol.t
   ; participant : Participant.t
   ; side : Side.t
@@ -44,7 +45,8 @@ type t =
 [@@deriving sexp_of, equal, compare]
 
 let to_string
-  ({ order_id
+  ({ client_order_id
+   ; order_id
    ; symbol = _
    ; participant
    ; side = _
@@ -59,6 +61,7 @@ let to_string
   let size = Size.to_int remaining_size in
   [%string
     "%{price} x%{size#Int} (id=%{order_id#Order_id}, \
+     client_id=%{client_order_id#Client_order_id}, \
      %{participant#Participant})"]
 ;;
 
@@ -67,7 +70,8 @@ let create (req : Request.t) ~order_id =
   then
     raise_s
       [%message "Order.create: size must be positive" (req.size : Size.t)];
-  { order_id
+  { client_order_id = req.client_order_id
+  ; order_id
   ; symbol = req.symbol
   ; participant = req.participant
   ; side = req.side
@@ -78,6 +82,7 @@ let create (req : Request.t) ~order_id =
   }
 ;;
 
+let client_order_id t = t.client_order_id
 let order_id t = t.order_id
 let symbol t = t.symbol
 let participant t = t.participant
