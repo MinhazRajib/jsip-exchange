@@ -14,6 +14,7 @@ let with_server ~symbols f =
 type client = { conn : Rpc.Connection.t }
 
 let connect_as ~port _participant =
+  (* print_endline [%string "[for %{_participant#Participant}]"]; ts *)
   let where =
     Tcp.Where_to_connect.of_host_and_port { host = "localhost"; port }
   in

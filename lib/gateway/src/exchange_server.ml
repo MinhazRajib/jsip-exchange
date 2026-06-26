@@ -14,7 +14,6 @@ type t =
 module Connection_state = struct
   type t = { mutable session : Session.t option }
 
-  let initialize = { session = None }
   let session t = t.session
 end
 
@@ -107,16 +106,15 @@ let start ~symbols ~port () =
             (fun (state : Connection_state.t) () ->
                match state.session with
                | None -> return (Or_error.error_string "not logged in")
-               | Some _ ->
-                 let reader = Dispatcher.subscribe_audit dispatcher in
+               | Some session ->
+                 let reader = Session.reader session in
                  return (Ok reader))
         ]
       ~on_unknown_rpc:`Close_connection
       ~on_exception:Log_on_background_exn
   in
   let initial_connection_state _ conn =
-    (* idk if this works *)
-    let state = Connection_state.initialize in
+    let state = ({ session = None } : Connection_state.t) in
     let () =
       don't_wait_for
         (let%bind () = Rpc.Connection.close_finished conn in

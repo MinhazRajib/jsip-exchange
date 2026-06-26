@@ -38,7 +38,7 @@ let run_client ~host ~port ~participant_name =
     | Fill fill -> (match (Fill.to_participant_view fill participant) with 
       | Some msg -> print_endline msg
       | None -> ())
-    | _ -> ()));
+    | _ -> print_endline (Event_formatter.format_event event)));
   let rec loop () = 
     print_string "> ";
     match%bind Reader.read_line (Lazy.force Reader.stdin) with
