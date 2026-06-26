@@ -30,9 +30,27 @@ let handle_submit ~request_writer (request : Order.Request.t) =
 ;;
 
 let start_matching_loop ~engine ~dispatcher request_reader =
+  let filter_bad_client_order_ids engine (request : Order.Request.t) =
+    match Dispatcher.get_session dispatcher request.participant with
+    | Some (session : Session.t) ->
+      (match
+         Hashtbl.find
+           (Session.client_order_ids session)
+           request.client_order_id
+       with
+       | Some _ ->
+         [ Exchange_event.Order_reject
+             { request; reason = "client order id already exits" }
+         ]
+       | None -> Matching_engine.submit engine request)
+    | None ->
+      [ Exchange_event.Order_reject
+          { request; reason = "participant is not logged in" }
+      ]
+  in
   don't_wait_for
     (Pipe.iter_without_pushback request_reader ~f:(fun request ->
-       let events = Matching_engine.submit engine request in
+       let events = filter_bad_client_order_ids engine request in
        Dispatcher.dispatch dispatcher events))
 ;;
 
