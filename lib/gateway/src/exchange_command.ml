@@ -40,13 +40,18 @@ let parse ?default_participant:participant line =
       (match command with 
         | Buy| Sell -> (
           match remaining_arguments with 
-            | symbol_str :: size_str :: price_str :: rest ->
+            | client_order_id_str :: symbol_str :: size_str :: price_str :: rest ->
                 let%bind side =
                   match command with
                   | Buy -> Ok Side.Buy
                   | Sell -> Ok Side.Sell
                   | _ ->
                     Or_error.error_string [%string "unknown command: this should not occur"]
+                in
+                let%bind client_order_id =
+                  match (Int.of_string_opt client_order_id_str) with
+                  | Some n  -> Ok n
+                  | None -> Or_error.error_string "Invalid client_order_id"
                 in
                 let%bind size =
                   match Int.of_string_opt size_str with
@@ -96,7 +101,8 @@ let parse ?default_participant:participant line =
                 in
                 Ok
                    (Submit 
-                   ({symbol
+                   ({ client_order_id = Client_order_id.of_int client_order_id
+                    ; symbol
                     ; participant
                     ; side
                     ; price
@@ -104,7 +110,7 @@ let parse ?default_participant:participant line =
                     ; time_in_force
                     }: Order.Request.t))
             | _ -> Or_error.error_string
-                [%string "expected: BUY|SELL <symbol> <size> <price> [ %{Time_in_force.all_str}] [as <name>]"]
+                [%string "expected: BUY|SELL <client_id> <symbol> <size> <price> [ %{Time_in_force.all_str}] [as <name>]"]
             )
           
         | Book | Subscribe ->(

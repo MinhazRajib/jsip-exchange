@@ -2,7 +2,8 @@ open! Core
 
 module Request = struct
   type t =
-    { symbol : Symbol.t
+    { client_order_id : Client_order_id.t
+    ; symbol : Symbol.t
     ; participant : Participant.t
     ; side : Side.t
     ; price : Price.t
@@ -11,12 +12,22 @@ module Request = struct
     }
   [@@deriving sexp, bin_io]
 
-  let to_string { symbol; participant; side; price; size; time_in_force } =
+  let to_string
+    { client_order_id
+    ; symbol
+    ; participant
+    ; side
+    ; price
+    ; size
+    ; time_in_force
+    }
+    =
     let price = Price.to_string_dollar price in
     let size = Size.to_int size in
     [%string
-      "%{side#Side} %{symbol#Symbol} %{size#Int}@%{price} \
-       %{time_in_force#Time_in_force} as %{participant#Participant}"]
+      "%{client_order_id#Client_order_id} %{side#Side} %{symbol#Symbol} \
+       %{size#Int}@%{price} %{time_in_force#Time_in_force} as \
+       %{participant#Participant}"]
   ;;
 end
 
