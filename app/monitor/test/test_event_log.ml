@@ -38,10 +38,10 @@ let%expect_test "events appear in insertion order" =
   [%expect
     {|
     count=6
-    ACCEPTED id=1 AAPL BUY 100@$150.00 DAY
-    FILL fill_id=1 AAPL $150.00 x100 aggressor=2(Alice) BUY resting=1(Bob)
-    CANCELLED id=1 AAPL remaining=50 reason=IOC_REMAINDER
-    REJECTED AAPL BUY 100@$150.00 reason=unknown symbol
+    ACCEPTED client-id=0 id=1 AAPL BUY 100@$150.00 DAY
+    FILL fill_id=1 AAPL $150.00 x100 aggressor=2 (client-id=0) (Alice) BUY resting=1 (client-id=0) (Bob)
+    CANCELLED client_id=0 id=1 AAPL remaining=50 reason=IOC_REMAINDER
+    REJECTED client-id=0 AAPL BUY 100@$150.00 reason=unknown symbol
     BBO AAPL bid=$149.90 x100 ask=$150.10 x200
     TRADE AAPL $150.00 x100
     |}]
@@ -56,7 +56,7 @@ let%expect_test "filter by substring keeps only matching lines" =
   in
   print_lines (Event_log.visible_lines log);
   [%expect
-    {| FILL fill_id=1 AAPL $150.00 x100 aggressor=2(Alice) BUY resting=1(Bob) |}]
+    {| FILL fill_id=1 AAPL $150.00 x100 aggressor=2 (client-id=0) (Alice) BUY resting=1 (client-id=0) (Bob) |}]
 ;;
 
 let%expect_test "substring filter is case-insensitive" =
@@ -78,9 +78,9 @@ let%expect_test "filter by category groups variants" =
   print_lines (Event_log.visible_lines log);
   [%expect
     {|
-    ACCEPTED id=1 AAPL BUY 100@$150.00 DAY
-    CANCELLED id=1 AAPL remaining=50 reason=IOC_REMAINDER
-    REJECTED AAPL BUY 100@$150.00 reason=unknown symbol
+    ACCEPTED client-id=0 id=1 AAPL BUY 100@$150.00 DAY
+    CANCELLED client_id=0 id=1 AAPL remaining=50 reason=IOC_REMAINDER
+    REJECTED client-id=0 AAPL BUY 100@$150.00 reason=unknown symbol
     |}]
 ;;
 
@@ -118,10 +118,10 @@ let%expect_test "each event variant renders with its assigned color" =
   print_styled (Event_log.visible_styled_lines log);
   [%expect
     {|
-    [green] ACCEPTED id=1 AAPL BUY 100@$150.00 DAY
-    [cyan] FILL fill_id=1 AAPL $150.00 x100 aggressor=2(Alice) BUY resting=1(Bob)
-    [yellow] CANCELLED id=1 AAPL remaining=50 reason=IOC_REMAINDER
-    [red] REJECTED AAPL BUY 100@$150.00 reason=unknown symbol
+    [green] ACCEPTED client-id=0 id=1 AAPL BUY 100@$150.00 DAY
+    [cyan] FILL fill_id=1 AAPL $150.00 x100 aggressor=2 (client-id=0) (Alice) BUY resting=1 (client-id=0) (Bob)
+    [yellow] CANCELLED client_id=0 id=1 AAPL remaining=50 reason=IOC_REMAINDER
+    [red] REJECTED client-id=0 AAPL BUY 100@$150.00 reason=unknown symbol
     [blue] BBO AAPL bid=$149.90 x100 ask=$150.10 x200
     [magenta] TRADE AAPL $150.00 x100
     |}]

@@ -102,7 +102,8 @@ let dispatch_event t (event : Exchange_event.t) =
   | Order_reject { request; reason = _ } ->
     push_to_session t request.participant event
   | Order_cancel
-      { order_id = _
+      { client_order_id = _
+      ; order_id = _
       ; participant
       ; symbol = _
       ; remaining_size = _
@@ -115,9 +116,11 @@ let dispatch_event t (event : Exchange_event.t) =
       ; price = _
       ; size = _
       ; aggressor_order_id = _
+      ; aggressor_client_order_id = _
       ; aggressor_participant
       ; aggressor_side = _
       ; resting_order_id = _
+      ; resting_client_order_id = _
       ; resting_participant
       } ->
     push_to_session t aggressor_participant event;

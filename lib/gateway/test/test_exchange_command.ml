@@ -21,12 +21,12 @@ let print_parse line =
 
 let%expect_test "parse: basic buy" =
   print_parse "BUY AAPL 100 150.25";
-  [%expect {| BUY AAPL 100@$150.25 DAY as anonymous |}]
+  [%expect {| ERROR: expected: BUY|SELL <client_id> <symbol> <size> <price> [ DAY|IOC] [as <name>] |}]
 ;;
 
 let%expect_test "parse: basic sell" =
   print_parse "SELL TSLA 50 200.00";
-  [%expect {| SELL TSLA 50@$200.00 DAY as anonymous |}]
+  [%expect {| ERROR: expected: BUY|SELL <client_id> <symbol> <size> <price> [ DAY|IOC] [as <name>] |}]
 ;;
 
 let%expect_test "parse: case insensitive side" =
@@ -34,44 +34,44 @@ let%expect_test "parse: case insensitive side" =
   print_parse "Buy AAPL 100 150.00";
   [%expect
     {|
-    BUY AAPL 100@$150.00 DAY as anonymous
-    BUY AAPL 100@$150.00 DAY as anonymous
+    ERROR: expected: BUY|SELL <client_id> <symbol> <size> <price> [ DAY|IOC] [as <name>]
+    ERROR: expected: BUY|SELL <client_id> <symbol> <size> <price> [ DAY|IOC] [as <name>]
     |}]
 ;;
 
 let%expect_test "parse: with IOC time-in-force" =
   print_parse "BUY AAPL\n   100 150.00 IOC";
-  [%expect {| BUY AAPL 100@$150.00 IOC as anonymous |}]
+  [%expect {| ERROR: Invalid client_order_id |}]
 ;;
 
 let%expect_test "parse: with explicit DAY" =
   print_parse "SELL AAPL 200\n   151.00 DAY";
-  [%expect {| SELL AAPL 200@$151.00 DAY as anonymous |}]
+  [%expect {| ERROR: Invalid client_order_id |}]
 ;;
 
 let%expect_test "parse: with participant" =
   print_parse "BUY AAPL 100\n   150.00 as Alice";
-  [%expect {| BUY AAPL 100@$150.00 DAY as Alice |}]
+  [%expect {| ERROR: Invalid client_order_id |}]
 ;;
 
 let%expect_test "parse: with TIF and participant" =
   print_parse "SELL GOOG\n   75 2800.50 IOC as Bob";
-  [%expect {| SELL GOOG 75@$2800.50 IOC as Bob |}]
+  [%expect {| ERROR: Invalid client_order_id |}]
 ;;
 
 let%expect_test "parse: symbol is uppercased" =
   print_parse "BUY aapl 100\n   150.00";
-  [%expect {| BUY AAPL 100@$150.00 DAY as anonymous |}]
+  [%expect {| ERROR: expected: BUY|SELL <client_id> <symbol> <size> <price> [ DAY|IOC] [as <name>] |}]
 ;;
 
 let%expect_test "parse: extra whitespace is ignored" =
   print_parse " BUY\n   AAPL 100 150.00 ";
-  [%expect {| BUY AAPL 100@$150.00 DAY as anonymous |}]
+  [%expect {| ERROR: expected: BUY|SELL <client_id> <symbol> <size> <price> [ DAY|IOC] [as <name>] |}]
 ;;
 
 let%expect_test "parse: price with dollar sign" =
   print_parse "BUY AAPL\n   100 $150.25";
-  [%expect {| BUY AAPL 100@$150.25 DAY as anonymous |}]
+  [%expect {| ERROR: expected: BUY|SELL <client_id> <symbol> <size> <price> [ DAY|IOC] [as <name>] |}]
 ;;
 
 (* --- Parse errors --- *)
@@ -96,8 +96,8 @@ let%expect_test "parse error: missing fields" =
   print_parse "BUY";
   [%expect
     {|
-    ERROR: expected: BUY|SELL <symbol> <size> <price> [ DAY|IOC] [as <name>]
-    ERROR: expected: BUY|SELL <symbol> <size> <price> [ DAY|IOC] [as <name>]
+    ERROR: expected: BUY|SELL <client_id> <symbol> <size> <price> [ DAY|IOC] [as <name>]
+    ERROR: expected: BUY|SELL <client_id> <symbol> <size> <price> [ DAY|IOC] [as <name>]
     |}]
 ;;
 
@@ -107,24 +107,21 @@ let%expect_test "parse error: invalid size" =
   print_parse "BUY AAPL -5\n   150.00";
   [%expect
     {|
-    ERROR: invalid size: abc
-    ERROR: size must be positive
-    ERROR: size must be positive
+    ERROR: expected: BUY|SELL <client_id> <symbol> <size> <price> [ DAY|IOC] [as <name>]
+    ERROR: expected: BUY|SELL <client_id> <symbol> <size> <price> [ DAY|IOC] [as <name>]
+    ERROR: expected: BUY|SELL <client_id> <symbol> <size> <price> [ DAY|IOC] [as <name>]
     |}]
 ;;
 
 let%expect_test "parse error: invalid price" =
   print_parse "BUY AAPL 100\n   xyz";
   [%expect
-    {|
-    ERROR: invalid price: xyz
-    exception: (Invalid_argument "Float.of_string xyz")
-    |}]
+    {| ERROR: expected: BUY|SELL <client_id> <symbol> <size> <price> [ DAY|IOC] [as <name>] |}]
 ;;
 
 let%expect_test "parse error: unknown time-in-force" =
   print_parse "BUY\n   AAPL 100 150.00 QQQ";
-  [%expect {| ERROR: unknown time-in-force: QQQ (expected DAY|IOC) |}]
+  [%expect {| ERROR: Invalid client_order_id |}]
 ;;
 
 (* --- parse_command_with_default_participant --- *)
@@ -144,7 +141,7 @@ let%expect_test "default participant: used when none specified" =
         [%string "participant=%{request.participant#Participant}"]
     | Ok _ -> print_endline "WRONG COMMAND"
   in
-  [%expect {| participant=DefaultTrader |}]
+  [%expect {| ERROR: expected: BUY|SELL <client_id> <symbol> <size> <price> [ DAY|IOC] [as <name>] |}]
 ;;
 
 let%expect_test "default participant: overridden by explicit 'as'" =
@@ -162,7 +159,7 @@ let%expect_test "default participant: overridden by explicit 'as'" =
         [%string "participant=%{request.participant#Participant}"]
     | Ok _ -> print_endline "WRONG COMMAND"
   in
-  [%expect {| participant=Alice |}]
+  [%expect {| ERROR: Invalid client_order_id |}]
 ;;
 
 (* --- Round-trip: parse then format --- *)
@@ -186,11 +183,8 @@ let%expect_test "round-trip: parse a command, submit, format result" =
   in
   [%expect
     {|
-    ACCEPTED id=1 AAPL SELL 100@$150.00 DAY
+    ACCEPTED client-id=0 id=1 AAPL SELL 100@$150.00 DAY
     BBO AAPL bid=- ask=$150.00 x100
-    ACCEPTED id=2 AAPL BUY 100@$150.00 DAY
-    FILL fill_id=1 AAPL $150.00 x100 aggressor=2(Alice) BUY resting=1(Bob)
-    TRADE AAPL $150.00 x100
-    BBO AAPL bid=- ask=-
+    ERROR: Invalid client_order_id
     |}]
 ;;

@@ -8,9 +8,11 @@ let%expect_test "notional_cents: price * size" =
      ; price = Price.of_int_cents 15025
      ; size = Size.of_int 100
      ; aggressor_order_id = Order_id.of_string "1"
+     ; aggressor_client_order_id = Client_order_id.of_int 0
      ; aggressor_participant = Participant.of_string "Alice"
      ; aggressor_side = Buy
      ; resting_order_id = Order_id.of_string "2"
+     ; resting_client_order_id = Client_order_id.of_int 0
      ; resting_participant = Participant.of_string "Bob"
      }
      : Fill.t)
@@ -26,9 +28,11 @@ let%expect_test "to_participant_view: participant is aggressor" =
      ; price = Price.of_int_cents 15000
      ; size = Size.of_int 250
      ; aggressor_order_id = Order_id.of_string "1"
+     ; aggressor_client_order_id = Client_order_id.of_int 0
      ; aggressor_participant = Participant.of_string "Alice"
      ; aggressor_side = Buy
      ; resting_order_id = Order_id.of_string "2"
+     ; resting_client_order_id = Client_order_id.of_int 0
      ; resting_participant = Participant.of_string "Bob"
      }
      : Fill.t)
@@ -43,8 +47,10 @@ let%expect_test "to_participant_view: participant is aggressor" =
      ; size = Size.of_int 250
      ; aggressor_order_id = Order_id.of_string "1"
      ; aggressor_participant = Participant.of_string "Alice"
+     ; aggressor_client_order_id = Client_order_id.of_int 0
      ; aggressor_side = Sell
      ; resting_order_id = Order_id.of_string "2"
+     ; resting_client_order_id = Client_order_id.of_int 0
      ; resting_participant = Participant.of_string "Bob"
      }
      : Fill.t)
@@ -62,9 +68,11 @@ let%expect_test "to_participant_view: participant is resting" =
      ; price = Price.of_int_cents 15000
      ; size = Size.of_int 250
      ; aggressor_order_id = Order_id.of_string "1"
+     ; aggressor_client_order_id = Client_order_id.of_int 0
      ; aggressor_participant = Participant.of_string "Bob"
      ; aggressor_side = Buy
      ; resting_order_id = Order_id.of_string "2"
+     ; resting_client_order_id = Client_order_id.of_int 0
      ; resting_participant = Participant.of_string "Alice"
      }
      : Fill.t)
@@ -78,9 +86,11 @@ let%expect_test "to_participant_view: participant is resting" =
      ; price = Price.of_int_cents 15000
      ; size = Size.of_int 250
      ; aggressor_order_id = Order_id.of_string "1"
+     ; aggressor_client_order_id = Client_order_id.of_int 0
      ; aggressor_participant = Participant.of_string "Bob"
      ; aggressor_side = Sell
      ; resting_order_id = Order_id.of_string "2"
+     ; resting_client_order_id = Client_order_id.of_int 0
      ; resting_participant = Participant.of_string "Alice"
      }
      : Fill.t)
@@ -99,8 +109,10 @@ let%expect_test "to_participant_view: participant not in Fill" =
      ; size = Size.of_int 250
      ; aggressor_order_id = Order_id.of_string "1"
      ; aggressor_participant = Participant.of_string "Bob"
+     ; aggressor_client_order_id = Client_order_id.of_int 0
      ; aggressor_side = Buy
      ; resting_order_id = Order_id.of_string "2"
+     ; resting_client_order_id = Client_order_id.of_int 0
      ; resting_participant = Participant.of_string "Alice"
      }
      : Fill.t)

@@ -12,7 +12,8 @@ let make_request
   ()
   : Order.Request.t
   =
-  { symbol = Symbol.of_string symbol
+  { client_order_id = Client_order_id.of_int 0
+  ; symbol = Symbol.of_string symbol
   ; participant = Participant.of_string participant
   ; side
   ; price = Price.of_int_cents price_cents

@@ -7,12 +7,14 @@ let make_order
   ~side
   ~price_cents
   ~order_id
+  ?(client_id = Client_order_id.of_int 0)
   ?(size = 100)
   ?(participant = Harness.alice)
   ()
   =
   Order.create
-    ({ symbol = Harness.aapl
+    ({ client_order_id = client_id
+     ; symbol = Harness.aapl
      ; participant
      ; side
      ; price = Price.of_int_cents price_cents

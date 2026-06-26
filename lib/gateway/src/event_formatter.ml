@@ -4,9 +4,9 @@ open Jsip_types
 let format_event = function
   | Exchange_event.Order_accept { order_id; request } ->
     sprintf
-      "ACCEPTED id=%s %s %s %s %d@%s %s"
-      (Order_id.to_string order_id)
+      "ACCEPTED client-id=%s id=%s %s %s %d@%s %s"
       (Client_order_id.to_string request.client_order_id)
+      (Order_id.to_string order_id)
       (Symbol.to_string request.symbol)
       (Side.to_string request.side)
       (Size.to_int request.size)
@@ -30,7 +30,8 @@ let format_event = function
       (Cancel_reason.to_string reason)
   | Order_reject { request; reason } ->
     sprintf
-      "REJECTED %s %s %d@%s reason=%s"
+      "REJECTED client-id=%s %s %s %d@%s reason=%s"
+      (Client_order_id.to_string request.client_order_id)
       (Symbol.to_string request.symbol)
       (Side.to_string request.side)
       (Size.to_int request.size)

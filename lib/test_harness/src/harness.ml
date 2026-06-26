@@ -28,6 +28,7 @@ let engine t = t.engine
 let make_request
   ~side
   ~price_cents
+  ?(client_id = Client_order_id.of_int 0)
   ?(size = 100)
   ?(symbol = aapl)
   ?(participant = alice)
@@ -35,7 +36,8 @@ let make_request
   ()
   : Order.Request.t
   =
-  { symbol
+  { client_order_id = client_id
+  ; symbol
   ; participant
   ; side
   ; price = Price.of_int_cents price_cents
@@ -94,7 +96,10 @@ let submit_quiet t request = Matching_engine.submit (engine t) request
 
 let sample_events : Exchange_event.t list =
   let order_request : Order.Request.t =
-    { symbol = aapl
+    { client_order_id =
+        Client_order_id.of_int
+          0 (* sample order_id, change for redundant order id testing *)
+    ; symbol = aapl
     ; participant = alice
     ; side = Buy
     ; price = Price.of_int_cents 15000
@@ -110,13 +115,16 @@ let sample_events : Exchange_event.t list =
       ; price = Price.of_int_cents 15000
       ; size = Size.of_int 100
       ; aggressor_order_id = Order_id.For_testing.of_int 2
+      ; aggressor_client_order_id = Client_order_id.of_int 0
       ; aggressor_participant = alice
       ; aggressor_side = Buy
       ; resting_order_id = Order_id.For_testing.of_int 1
+      ; resting_client_order_id = Client_order_id.of_int 0
       ; resting_participant = bob
       }
   ; Order_cancel
-      { order_id = Order_id.For_testing.of_int 1
+      { client_order_id = Client_order_id.of_int 0
+      ; order_id = Order_id.For_testing.of_int 1
       ; participant = alice
       ; symbol = aapl
       ; remaining_size = Size.of_int 50
