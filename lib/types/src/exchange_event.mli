@@ -27,6 +27,11 @@ type t =
       { request : Order.Request.t
       ; reason : string
       }
+  | Cancel_reject of
+      { participant : Participant.t
+      ; client_order_id : Client_order_id.t
+      ; reason : string
+      }
   | Best_bid_offer_update of
       { symbol : Symbol.t
       ; bbo : Bbo.t

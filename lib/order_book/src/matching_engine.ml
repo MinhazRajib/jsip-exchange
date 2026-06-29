@@ -42,6 +42,47 @@ let check_client_order_id t participant client_order_id =
 
 let book t symbol = Map.find t.books symbol
 
+(* remove an order *)
+let cancel t participant client_order_id =
+  match check_client_order_id t participant client_order_id with
+  | None ->
+    [ Exchange_event.Cancel_reject
+        { participant; client_order_id; reason = "Order does not exist" }
+    ]
+  | Some order ->
+    (match book t (Order.symbol order) with
+     | None ->
+       [ Exchange_event.Cancel_reject
+           { participant; client_order_id; reason = "Order does not exist" }
+       ]
+     | Some book ->
+       Hashtbl.remove
+         t.participant_client_order_ids
+         ({ participant; client_order_id } : Participant_client_order_ids.t);
+       let bbo_before = Order_book.best_bid_offer book in
+       Order_book.remove book (Order.order_id order);
+       let bbo_after = Order_book.best_bid_offer book in
+       let order_cancel =
+         Exchange_event.Order_cancel
+           { client_order_id = Order.client_order_id order
+           ; order_id = Order.order_id order
+           ; participant = Order.participant order
+           ; symbol = Order.symbol order
+           ; remaining_size = Order.size order
+           ; reason = Cancel_reason.Participant_requested
+           }
+       in
+       let bbo_events =
+         if Bbo.equal bbo_before bbo_after
+         then []
+         else
+           [ Exchange_event.Best_bid_offer_update
+               { symbol = Order.symbol order; bbo = bbo_after }
+           ]
+       in
+       List.concat [ [ order_cancel ]; bbo_events ])
+;;
+
 (** Run the matching loop: repeatedly find a compatible resting order and
     fill against it. Returns the list of Fill and Trade_report events
     produced, and the next fill_id to use. *)

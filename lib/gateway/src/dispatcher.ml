@@ -101,6 +101,8 @@ let dispatch_event t (event : Exchange_event.t) =
   | Order_accept { order_id = _; request }
   | Order_reject { request; reason = _ } ->
     push_to_session t request.participant event
+  | Cancel_reject { participant; client_order_id = _; reason = _ } ->
+    push_to_session t participant event
   | Order_cancel
       { client_order_id = _
       ; order_id = _

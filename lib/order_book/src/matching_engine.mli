@@ -36,3 +36,10 @@ val check_client_order_id
   -> Participant.t
   -> Client_order_id.t
   -> Order.t option
+
+(* User submits a reques to cancel an event. Returns the list of exchange
+   events produced: an order_cancel or cancel_rejection, followed by any bbo
+   changes.
+
+   The event list is always non-empty (at minimum an cancel or rejection) *)
+val cancel : t -> Participant.t -> Client_order_id.t -> Exchange_event.t list
