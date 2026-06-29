@@ -3,6 +3,12 @@ open! Async
 open Jsip_types
 open Jsip_order_book
 
+module Connection_state = struct
+  type t = { mutable session : Session.t option }
+
+  let participant t = Option.map t.session ~f:Session.participant
+end
+
 type t =
   { engine : Matching_engine.t
   ; dispatcher : Dispatcher.t
@@ -42,8 +48,45 @@ let start ~symbols ~port () =
         [ Rpc.Rpc.implement
             Rpc_protocol.submit_order_rpc
             (fun state request ->
-               ignore state;
-               handle_submit ~request_writer request)
+               match Connection_state.participant state with
+               | None ->
+                 Deferred.return (Or_error.error_string "Not logged in")
+               | Some participant ->
+                 let request' = { request with participant } in
+                 handle_submit ~request_writer request')
+        ; Rpc.Rpc.implement
+            Rpc_protocol.login_rpc
+            (fun state participant_name ->
+               let participant_name = String.strip participant_name in
+               if String.is_empty participant_name
+               then
+                 Deferred.return
+                   (Or_error.error_string
+                      "Participant name cannot be empty or whitespace")
+               else (
+                 let participant = Participant.of_string participant_name in
+                 let session = Session.create participant in
+                 let%bind () =
+                   Dispatcher.set_up_session dispatcher participant
+                 in
+                 match Connection_state.participant state with
+                 | None ->
+                   state.session <- Some session;
+                   Deferred.return (Ok participant)
+                 | Some _ ->
+                   Deferred.return
+                     (Or_error.error_string
+                        "Already logged in on this connection")))
+        ; Rpc.Pipe_rpc.implement
+            Rpc_protocol.session_feed_rpc
+            (fun state () ->
+               match Connection_state.participant state with
+               | None ->
+                 Deferred.return (Or_error.error_string "not logged in")
+               | Some participant ->
+                 let session = Session.create participant in
+                 let reader = Session.reader session in
+                 Deferred.return (Ok reader))
         ; Rpc.Rpc.implement' Rpc_protocol.book_query_rpc (fun state symbol ->
             ignore state;
             Matching_engine.book engine symbol
@@ -67,7 +110,8 @@ let start ~symbols ~port () =
   let%map tcp_server =
     Rpc.Connection.serve
       ~implementations
-      ~initial_connection_state:(fun _addr _conn -> ())
+      ~initial_connection_state:(fun _addr _conn ->
+        Connection_state.{ session = None })
       ~where_to_listen:(Tcp.Where_to_listen.of_port port)
       ()
   in

@@ -37,6 +37,9 @@ val subscribe_market_data
   -> Symbol.t list
   -> Exchange_event.t Pipe.Reader.t
 
+val clean_up_session : t -> Session.t -> unit Deferred.t
+val set_up_session : t -> Participant.t -> unit Deferred.t
+
 (** Subscribe to the full unfiltered event firehose. Intended for the monitor
     / admin tools. *)
 val subscribe_audit : t -> Exchange_event.t Pipe.Reader.t

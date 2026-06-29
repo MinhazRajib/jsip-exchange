@@ -2,6 +2,25 @@ open! Core
 open! Async
 open Jsip_types
 
+let login_rpc =
+  Rpc.Rpc.create
+    ~name:"login"
+    ~version:1
+    ~bin_query:String.bin_t
+    ~bin_response:(Or_error.bin_t Participant.bin_t)
+    ~include_in_error_count:Only_on_exn
+;;
+
+let session_feed_rpc =
+  Rpc.Pipe_rpc.create
+    ~name:"session-feed"
+    ~version:1
+    ~bin_query:Unit.bin_t
+    ~bin_response:Exchange_event.bin_t
+    ~bin_error:Error.bin_t
+    ()
+;;
+
 let submit_order_rpc =
   Rpc.Rpc.create
     ~name:"submit-order"

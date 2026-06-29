@@ -17,6 +17,19 @@ let run_client ~host ~port ~participant_name =
     Tcp.Where_to_connect.of_host_and_port { host; port }
   in
   let%bind conn = Rpc.Connection.client where_to_connect >>| Result.ok_exn in
+  (* Login *)
+  let%bind _login_result =
+    Rpc.Rpc.dispatch_exn Rpc_protocol.login_rpc conn participant_name
+  in
+  (* Subscribe to session feed *)
+  let%bind session_feed, _metadata =
+    Rpc.Pipe_rpc.dispatch_exn Rpc_protocol.session_feed_rpc conn ()
+  in
+  (* Read events in background *)
+  don't_wait_for
+    (Pipe.iter_without_pushback session_feed ~f:(fun event ->
+       let e = Protocol.format_event event in
+       print_endline [%string "[%{participant#Participant}] %{e}"]));
   print_endline
     [%string
       {|

@@ -11,6 +11,9 @@ open! Core
 open! Async
 open Jsip_types
 
+val login_rpc : (String.t, Participant.t Or_error.t) Rpc.Rpc.t
+val session_feed_rpc : (unit, Exchange_event.t, Error.t) Rpc.Pipe_rpc.t
+
 (** Submit an order to the exchange.
 
     This is a one-way RPC. The server enqueues the order and returns as soon
