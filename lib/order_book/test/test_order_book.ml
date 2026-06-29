@@ -18,6 +18,7 @@ let make_order
      ; price = Price.of_int_cents price_cents
      ; size = Size.of_int size
      ; time_in_force = Day
+     ; client_order_id = Client_order_id.of_int 0
      }
      : Order.Request.t)
     ~order_id:(Order_id.For_testing.of_int order_id)

@@ -41,6 +41,7 @@ let make_request
   ; price = Price.of_int_cents price_cents
   ; size = Size.of_int size
   ; time_in_force
+  ; client_order_id = Client_order_id.of_int 0
   }
 ;;
 
@@ -100,6 +101,7 @@ let sample_events : Exchange_event.t list =
     ; price = Price.of_int_cents 15000
     ; size = Size.of_int 100
     ; time_in_force = Day
+    ; client_order_id = Client_order_id.of_int 0
     }
   in
   [ Order_accept

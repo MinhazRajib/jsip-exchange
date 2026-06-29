@@ -159,6 +159,7 @@ let%expect_test "format_event: all event types" =
             ; price = Price.of_int_cents 15000
             ; size = Size.of_int 100
             ; time_in_force = Day
+            ; client_order_id = Client_order_id.of_int 0
             }
         }
     ; Fill
@@ -187,6 +188,7 @@ let%expect_test "format_event: all event types" =
             ; price = Price.of_int_cents 28000
             ; size = Size.of_int 10
             ; time_in_force = Day
+            ; client_order_id = Client_order_id.of_int 0
             }
         ; reason = "unknown symbol"
         }

@@ -77,6 +77,7 @@ let parse_command line =
             ; price
             ; size = Size.of_int size
             ; time_in_force
+            ; client_order_id = Client_order_id.of_int 0
             }
             : Order.Request.t)
        | _ ->
