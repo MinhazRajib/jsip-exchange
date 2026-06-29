@@ -10,12 +10,14 @@ type t =
   | Submit of Order.Request.t
   | Book of Symbol.t
   | Subscribe of Symbol.t
+  | Cancel of Client_order_id.t
 
 type verb =
   | Buy
   | Sell
   | Book
   | Subscribe
+  | Cancel
 [@@deriving string]
 
 (** [{Command}] *)

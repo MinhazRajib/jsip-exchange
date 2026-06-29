@@ -60,6 +60,19 @@ let%expect_test "book-query RPC" =
   return ()
 ;;
 
+let%expect_test "cancel-order RPC" =
+  print_s
+    [%sexp
+      (Rpc.Rpc.shapes Rpc_protocol.cancel_order_rpc
+       : Async_rpc_kernel.Rpc_shapes.t)];
+  [%expect
+    {|
+    (Rpc (query d9a8da25d5656b016fb4dbdc2e4197fb)
+     (response 9bf9d93dd466a19cac18ecff7cd287af))
+    |}];
+  return ()
+;;
+
 let%expect_test "market-data RPC" =
   print_s
     [%sexp

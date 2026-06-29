@@ -5,12 +5,14 @@ type t =
   | Submit of Order.Request.t
   | Book of Symbol.t
   | Subscribe of Symbol.t
+  | Cancel of Client_order_id.t
 
 type verb =
   | Buy
   | Sell
   | Book
   | Subscribe
+  | Cancel
 [@@deriving string ~case_insensitive ~capitalize:"SCREAMING_SNAKE_CASE"]
 
 (* Default participant when no "as <name>" is specified in the command, adding the optional argument 
@@ -34,6 +36,7 @@ let parse ?default_participant:participant line =
         | "SELL" -> Ok Sell
         | "BOOK" -> Ok Book
         | "SUBSCRIBE" -> Ok Subscribe
+        | "CANCEL" -> Ok Cancel
         | other -> Or_error.error_string [%string "unknown command: %{other} (expected BUY/SELL/BOOK/SUBSCRIBE)"]
       in
 
@@ -131,6 +134,18 @@ let parse ?default_participant:participant line =
           | [] ->
               Or_error.error_string
                 "expected: BOOK|SUBSCRIBE <symbol>"
+        )
+        | Cancel -> (
+          match remaining_arguments with 
+          | client_order_id_str::_ -> 
+            let%bind client_id =
+                match (Int.of_string_opt client_order_id_str) with
+                  | Some n  -> Ok n
+                  | None -> Or_error.error_string "Invalid client_order_id"
+            in
+            Ok (Cancel (Client_order_id.of_int client_id) : t)
+          | [] -> Or_error.error_string
+                "expected: CANCEL <client_id>"
         )
       )
 ;;

@@ -34,5 +34,11 @@ val connection : client -> Rpc.Connection.t
     dispatcher's session stub. *)
 val rpc_submit : client -> Order.Request.t -> unit Deferred.t
 
+(** Cancel an order via RPC. The RPC is one-way: this returns once the server
+    has enqueued the request. Participant-targeted events (acceptance, fills,
+    rejection, cancel) are currently printed on the server's stdout via the
+    dispatcher's session stub. *)
+val rpc_cancel : client -> Client_order_id.t -> unit Deferred.t
+
 (** Query the book via RPC. *)
 val rpc_book : client -> Symbol.t -> Book.t option Deferred.t

@@ -353,3 +353,143 @@ let%expect_test "dispatcher: closing a subscriber's reader removes the \
   [%expect {| ("after closing reader_b" (count 0)) |}];
   return ()
 ;;
+
+(* ---------------------------------------------------------------- *)
+(* Client cancels *)
+(* ---------------------------------------------------------------- *)
+
+let%expect_test "e2e: client adds a order, cancels it and gains \
+                 order_cancel in feed"
+  =
+  with_server ~symbols:[ Harness.aapl ] (fun ~server:_ ~port ->
+    let%bind alice = connect_as ~port Harness.alice in
+    (* Alice places a sell *)
+    let%bind () =
+      rpc_submit
+        alice
+        (Harness.sell ~price_cents:15000 ~participant:Harness.alice ())
+    in
+    [%expect
+      {| [for Alice] ACCEPTED client-id=0 id=2 AAPL BUY 100@$150.00 DAY |}];
+    (* Alice cancels order *)
+    let%bind () = rpc_cancel alice (Client_order_id.of_int 0) in
+    [%expect
+      {| [for Alice] CANCELLED client_id=0 id=2 AAPL remaining=100 reason=Participant.request |}];
+    return ())
+;;
+
+let%expect_test "e2e: duplicate client order IDs are rejected" =
+  with_server ~symbols:[ Harness.aapl ] (fun ~server:_ ~port ->
+    let%bind alice = connect_as ~port Harness.alice in
+    (* Alice places a sell *)
+    let%bind () =
+      rpc_submit
+        alice
+        (Harness.sell ~price_cents:15000 ~participant:Harness.alice ())
+    in
+    [%expect
+      {| [for Alice] ACCEPTED client-id=0 id=2 AAPL BUY 100@$150.00 DAY |}];
+    let%bind () =
+      rpc_submit
+        alice
+        (Harness.sell ~price_cents:10000 ~participant:Harness.alice ())
+    in
+    [%expect
+      {| [for Alice] REJECTED client-id=0 AAPL BUY 100@100.00 reason=ID already in use |}];
+    return ())
+;;
+
+let%expect_test "e2e: cancel an already filled order" =
+  with_server ~symbols:[ Harness.aapl ] (fun ~server:_ ~port ->
+    let%bind alice = connect_as ~port Harness.alice in
+    let%bind bob = connect_as ~port Harness.bob in
+    (* Bob places a sell *)
+    let%bind () =
+      rpc_submit
+        bob
+        (Harness.sell ~price_cents:15000 ~participant:Harness.bob ())
+    in
+    [%expect
+      {| [for Bob] ACCEPTED client-id=0 id=1 AAPL SELL 100@$150.00 DAY |}];
+    (* Alice places a buy — should cross *)
+    let%bind () = rpc_submit alice (Harness.buy ~price_cents:15000 ()) in
+    [%expect
+      {|
+      [for Alice] ACCEPTED client-id=0 id=2 AAPL BUY 100@$150.00 DAY
+      [for Alice] FILL fill_id=1 AAPL $150.00 x100 aggressor=2 (client-id=0) (Alice) BUY resting=1 (client-id=0) (Bob)
+      [for Bob] FILL fill_id=1 AAPL $150.00 x100 aggressor=2 (client-id=0) (Alice) BUY resting=1 (client-id=0) (Bob)
+      |}];
+    (* Alice cancels order *)
+    let%bind () = rpc_cancel alice (Client_order_id.of_int 0) in
+    [%expect
+      {| [for Alice] REJECTED Cancel Request client-id:0 (alice) reason=Does not exist |}];
+    return ())
+;;
+
+let%expect_test "e2e: cancel a nonexistent order" =
+  with_server ~symbols:[ Harness.aapl ] (fun ~server:_ ~port ->
+    let%bind alice = connect_as ~port Harness.alice in
+    (* Alice cancels order *)
+    let%bind () = rpc_cancel alice (Client_order_id.of_int 0) in
+    [%expect
+      {| [for Alice] REJECTED Cancel Request client-id:0 (alice) reason=Does not exist |}];
+    return ())
+;;
+
+let%expect_test "e2e: BBO update after cancel" =
+  with_server ~symbols:[ Harness.aapl ] (fun ~server:_ ~port ->
+    let%bind bob = connect_as ~port Harness.bob in
+    let%bind charlie = connect_as ~port Harness.charlie in
+    (* Bob posts a sell *)
+    let%bind () =
+      rpc_submit
+        bob
+        (Harness.sell
+           ~price_cents:15000
+           ~size:50
+           ~participant:Harness.bob
+           ())
+    in
+    [%expect
+      {| [for Bob] ACCEPTED client-id=0 id=1 AAPL SELL 50@$150.00 DAY |}];
+    (* Charlie posts a sell at a higher price *)
+    let%bind () =
+      rpc_submit
+        charlie
+        (Harness.sell
+           ~price_cents:15010
+           ~size:50
+           ~participant:Harness.charlie
+           ())
+    in
+    [%expect
+      {| [for Charlie] ACCEPTED client-id=0 id=2 AAPL SELL 50@$150.10 DAY |}];
+    (* Verify book state prior to cancel *)
+    let%bind book = rpc_book bob Harness.aapl in
+    print_endline (Option.value_exn book |> Book.to_string);
+    [%expect
+      {|
+      === AAPL ===
+        BIDS: (empty)
+        ASKS:
+          $150.00 x50
+          $150.10 x50
+        BBO: - / $150.00 x50
+      |}];
+    (* Bob cancels order *)
+    let%bind () = rpc_cancel bob (Client_order_id.of_int 0) in
+    [%expect
+      {| [for Bob] CANCELLED client_id=0 id=1 AAPL remaining=50 reason=Participant.request |}];
+    (* Verify book state after cancel *)
+    let%bind book = rpc_book bob Harness.aapl in
+    print_endline (Option.value_exn book |> Book.to_string);
+    [%expect
+      {|
+      === AAPL ===
+        BIDS: (empty)
+        ASKS:
+          $150.10 x50
+        BBO: - / $150.10 x50
+      |}];
+    return ())
+;;

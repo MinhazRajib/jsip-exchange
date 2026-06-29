@@ -61,6 +61,9 @@ let run_client ~host ~port ~participant_name =
             Rpc.Rpc.dispatch_exn Rpc_protocol.submit_order_rpc conn request
           in
           loop ()
+        | Ok (Exchange_command.Cancel client_order_id) ->
+            let%bind.Deferred.Or_error () = Rpc.Rpc.dispatch_exn Rpc_protocol.cancel_order_rpc conn client_order_id in
+          loop ()
         | Ok (Exchange_command.Book symbol) ->
           let%bind result =
             Rpc.Rpc.dispatch_exn Rpc_protocol.book_query_rpc conn symbol

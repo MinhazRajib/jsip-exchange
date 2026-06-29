@@ -38,6 +38,10 @@ val submit_order_rpc : (Order.Request.t, unit Or_error.t) Rpc.Rpc.t
     all resting orders on both sides, if a book for that symbol exists. *)
 val book_query_rpc : (Symbol.t, Book.t option) Rpc.Rpc.t
 
+(** Cancel a given client_order. Returns an error if order does not exist,
+    unit if no errors. *)
+val cancel_order_rpc : (Client_order_id.t, unit Or_error.t) Rpc.Rpc.t
+
 (** Subscribe to market data for one or more symbols. The server pushes BBO
     updates and trade reports as they happen via a single pipe. The query is
     the list of symbols to subscribe to; using one RPC for the whole list

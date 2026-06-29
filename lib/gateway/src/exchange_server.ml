@@ -102,6 +102,21 @@ let start ~symbols ~port () =
             ignore state;
             Matching_engine.book engine symbol
             |> Option.map ~f:Order_book.snapshot)
+        ; Rpc.Rpc.implement
+            Rpc_protocol.cancel_order_rpc
+            (fun state client_order_id ->
+               match Connection_state.session state with
+               | None ->
+                 Async.return
+                   (Or_error.error_string "submit_order_rpc: not logged in")
+               | Some session ->
+                 let participant = Session.participant session in
+                 let cancel_attempt =
+                   Matching_engine.cancel engine participant client_order_id
+                 in
+                 List.iter cancel_attempt ~f:(fun event ->
+                   Session.push session event);
+                 Async.return (Ok ()))
         ; Rpc.Pipe_rpc.implement
             Rpc_protocol.market_data_rpc
             (fun state symbols ->

@@ -42,6 +42,14 @@ let rpc_submit client request =
   >>| ok_exn
 ;;
 
+let rpc_cancel client client_order_id =
+  Rpc.Rpc.dispatch_exn
+    Rpc_protocol.cancel_order_rpc
+    client.conn
+    client_order_id
+  >>| ok_exn
+;;
+
 let rpc_book client symbol =
   Rpc.Rpc.dispatch_exn Rpc_protocol.book_query_rpc client.conn symbol
 ;;
