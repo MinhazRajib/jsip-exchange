@@ -25,9 +25,6 @@ val participant : t -> Participant.t
     session. *)
 val reader : t -> Exchange_event.t Pipe.Reader.t
 
-(** The client_order_id s this session holds. *)
-val client_order_ids : t -> Order.t Client_order_id.Table.t
-
 (** Push an event onto the session's outbound pipe. *)
 val push : t -> Exchange_event.t -> unit
 

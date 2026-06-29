@@ -29,3 +29,10 @@ val submit : t -> Order.Request.t -> Exchange_event.t list
 (** The order book for a given symbol, or [None] if the symbol is not traded
     on this engine. *)
 val book : t -> Symbol.t -> Order_book.t option
+
+(** helpers for client order id *)
+val check_client_order_id
+  :  t
+  -> Participant.t
+  -> Client_order_id.t
+  -> Order.t option

@@ -1,10 +1,23 @@
 open! Core
 open Jsip_types
 
+module Participant_client_order_ids = struct
+  type t =
+    { participant : Participant.t
+    ; client_order_id : Client_order_id.t
+    }
+  [@@deriving sexp, compare, sexp_of, hash]
+
+  include functor Comparable.Make_plain
+  include functor Hashable.Make_plain
+end
+
 type t =
   { books : Order_book.t Symbol.Map.t
   ; order_id_gen : Order_id.Generator.t
   ; mutable next_fill_id : int
+  ; mutable participant_client_order_ids :
+      Order.t Participant_client_order_ids.Table.t
   }
 [@@deriving sexp_of]
 
@@ -13,7 +26,18 @@ let create symbols =
     List.map symbols ~f:(fun sym -> sym, Order_book.create sym)
     |> Symbol.Map.of_alist_exn
   in
-  { books; order_id_gen = Order_id.Generator.create (); next_fill_id = 1 }
+  { books
+  ; order_id_gen = Order_id.Generator.create ()
+  ; next_fill_id = 1
+  ; participant_client_order_ids =
+      Participant_client_order_ids.Table.create ()
+  }
+;;
+
+let check_client_order_id t participant client_order_id =
+  Hashtbl.find
+    t.participant_client_order_ids
+    ({ participant; client_order_id } : Participant_client_order_ids.t)
 ;;
 
 let book t symbol = Map.find t.books symbol
@@ -85,6 +109,12 @@ let submit t (request : Order.Request.t) =
         match Order.time_in_force order with
         | Day ->
           Order_book.add book order;
+          let key : Participant_client_order_ids.t =
+            { participant = Order.participant order
+            ; client_order_id = Order.client_order_id order
+            }
+          in
+          Hashtbl.add_exn t.participant_client_order_ids ~key ~data:order;
           []
         | Ioc ->
           [ Exchange_event.Order_cancel

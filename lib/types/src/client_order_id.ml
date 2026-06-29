@@ -9,9 +9,15 @@ include Comparable.Make (T)
 include Hashable.Make (T)
 
 module Generator = struct
-  type t = { mutable id : int } [@@deriving sexp_of]
+  type t = { mutable next : int } [@@deriving sexp_of]
 
-  let create num = { id = num }
+  let create () = { next = 1 }
+
+  let next t =
+    let id = t.next in
+    t.next <- t.next + 1;
+    id
+  ;;
 end
 
 let to_int t = t
