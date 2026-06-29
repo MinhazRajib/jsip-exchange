@@ -19,7 +19,8 @@ module Generator : sig
   (* type client_order_id := t DECIDE WHETHER TO KEEP LATER *)
   type t [@@deriving sexp_of]
 
-  val create : int -> t
+  val create : unit -> t
+  val next : t -> int
 end
 
 val to_int : t -> int

@@ -54,6 +54,7 @@ val engine : t -> Matching_engine.t
 val buy
   :  price_cents:int
   -> ?size:int
+  -> ?client_id:Client_order_id.t
   -> ?symbol:Symbol.t
   -> ?participant:Participant.t
   -> ?time_in_force:Time_in_force.t
@@ -63,6 +64,7 @@ val buy
 val sell
   :  price_cents:int
   -> ?size:int
+  -> ?client_id:Client_order_id.t
   -> ?symbol:Symbol.t
   -> ?participant:Participant.t
   -> ?time_in_force:Time_in_force.t

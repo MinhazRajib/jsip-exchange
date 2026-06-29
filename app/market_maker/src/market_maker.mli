@@ -26,6 +26,8 @@ module Config : sig
     ; num_levels : int
     (** Number of price levels on each side. The bot places orders at
         [fair_value +/- spread], [fair_value +/- (spread + tick)], etc. *)
+    ; client_id_manager : Client_order_id.Generator.t
+    (** handles client ids *)
     }
   [@@deriving sexp_of]
 end

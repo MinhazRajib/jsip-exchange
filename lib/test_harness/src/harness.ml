@@ -28,8 +28,8 @@ let engine t = t.engine
 let make_request
   ~side
   ~price_cents
-  ?(client_id = Client_order_id.of_int 0)
   ?(size = 100)
+  ?(client_id = Client_order_id.of_int 0)
   ?(symbol = aapl)
   ?(participant = alice)
   ?(time_in_force = Time_in_force.Day)
@@ -46,22 +46,25 @@ let make_request
   }
 ;;
 
-let buy ~price_cents ?size ?symbol ?participant ?time_in_force () =
+let buy ~price_cents ?size ?client_id ?symbol ?participant ?time_in_force () =
   make_request
     ~side:Buy
     ~price_cents
     ?size
+    ?client_id
     ?symbol
     ?participant
     ?time_in_force
     ()
 ;;
 
-let sell ~price_cents ?size ?symbol ?participant ?time_in_force () =
+let sell ~price_cents ?size ?client_id ?symbol ?participant ?time_in_force ()
+  =
   make_request
     ~side:Sell
     ~price_cents
     ?size
+    ?client_id
     ?symbol
     ?participant
     ?time_in_force

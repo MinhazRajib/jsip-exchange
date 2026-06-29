@@ -11,6 +11,7 @@ module Config = struct
     ; half_spread_cents : int
     ; size_per_level : int
     ; num_levels : int
+    ; client_id_manager : Client_order_id.Generator.t
     }
   [@@deriving sexp_of]
 end
@@ -35,7 +36,9 @@ let seed_book (config : Config.t) conn =
       let offset = config.half_spread_cents + level in
       let%bind () =
         submit
-          ({ client_order_id = Client_order_id.of_int 0
+          ({ client_order_id =
+               Client_order_id.of_int
+                 (Client_order_id.Generator.next config.client_id_manager)
            ; symbol = config.symbol
            ; participant = config.participant
            ; side = Buy
@@ -46,7 +49,9 @@ let seed_book (config : Config.t) conn =
            : Order.Request.t)
       and () =
         submit
-          ({ client_order_id = Client_order_id.of_int 0
+          ({ client_order_id =
+               Client_order_id.of_int
+                 (Client_order_id.Generator.next config.client_id_manager)
            ; symbol = config.symbol
            ; participant = config.participant
            ; side = Sell
