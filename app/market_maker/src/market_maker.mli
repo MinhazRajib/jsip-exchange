@@ -28,6 +28,8 @@ module Config : sig
         [fair_value +/- spread], [fair_value +/- (spread + tick)], etc. *)
     ; client_id_manager : Client_order_id.Generator.t
     (** handles client ids *)
+    ; mutable inventory_counter : Size.t Symbol.Table.t
+    ; mutable resting_client_order_ids : Size.t Client_order_id.Table.t
     }
   [@@deriving sexp_of]
 end
@@ -39,3 +41,7 @@ end
     matching-engine response (acceptance, fills, rejection) arrives on the
     participant's session feed. *)
 val seed_book : Config.t -> Rpc.Connection.t -> unit Deferred.t
+
+(** Seeds the initial ladder, subscribes the session feed and reacts to fills
+    by cancelling resting orders and reposting *)
+val run : Config.t -> Rpc.Connection.t -> unit Deferred.t

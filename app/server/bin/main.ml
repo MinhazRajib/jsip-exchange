@@ -55,6 +55,8 @@ let seed_market_maker ~where_to_connect =
     ; size_per_level = 100
     ; num_levels = 5
     ; client_id_manager = Client_order_id.Generator.create ()
+    ; inventory_counter = Symbol.Table.create ()
+    ; resting_client_order_ids = Client_order_id.Table.create ()
     }
   in
   let%bind conn = connect_as ~where_to_connect mm_participant in
@@ -92,6 +94,8 @@ let trade_back_and_forth ~where_to_connect =
     ; size_per_level = 25
     ; num_levels = 3
     ; client_id_manager = Client_order_id.Generator.create ()
+    ; inventory_counter = Symbol.Table.create ()
+    ; resting_client_order_ids = Client_order_id.Table.create ()
     }
   in
   (* Two market makers total, each shared across all symbols — so we open
