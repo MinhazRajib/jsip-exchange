@@ -128,6 +128,10 @@ let format_event = function
   | Trade_report { symbol; price; size } ->
     let size = Size.to_int size in
     [%string "TRADE %{symbol#Symbol} %{price#Price} x%{size#Int}"]
+  | Cancel_reject { participant; client_order_id; reason } ->
+    [%string
+      "CANCEL_REJECT %{participant#Participant} \
+       %{client_order_id#Client_order_id} reason=%{reason}"]
 ;;
 
 let format_events events =
