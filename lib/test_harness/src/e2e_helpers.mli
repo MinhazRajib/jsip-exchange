@@ -24,6 +24,13 @@ type client
     the same connection. Every event received is printed to the feed. *)
 val connect_as : port:int -> Participant.t -> client Deferred.t
 
+(** Connect a client to [port].
+
+    dispatches the [participant] and a session_feed_rpc over the same
+    connection. No log in is attempted Every event received is printed to the
+    feed. *)
+val connect_as_no_login : port:int -> Participant.t -> client Deferred.t
+
 (** The raw RPC connection, useful for tests that exercise unusual RPC paths
     (audit log subscriptions, second clients on the same connection, etc.). *)
 val connection : client -> Rpc.Connection.t

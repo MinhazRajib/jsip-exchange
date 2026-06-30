@@ -370,11 +370,11 @@ let%expect_test "e2e: client adds a order, cancels it and gains \
         (Harness.sell ~price_cents:15000 ~participant:Harness.alice ())
     in
     [%expect
-      {| [for Alice] ACCEPTED client-id=0 id=2 AAPL BUY 100@$150.00 DAY |}];
+      {| [for Alice] ACCEPTED client-id=0 id=1 AAPL SELL 100@$150.00 DAY |}];
     (* Alice cancels order *)
     let%bind () = rpc_cancel alice (Client_order_id.of_int 0) in
     [%expect
-      {| [for Alice] CANCELLED client_id=0 id=2 AAPL remaining=100 reason=Participant.request |}];
+      {| [for Alice] CANCELLED client_id=0 id=1 AAPL remaining=100 reason=PARTICIPANT_REQUESTED |}];
     return ())
 ;;
 
@@ -388,14 +388,14 @@ let%expect_test "e2e: duplicate client order IDs are rejected" =
         (Harness.sell ~price_cents:15000 ~participant:Harness.alice ())
     in
     [%expect
-      {| [for Alice] ACCEPTED client-id=0 id=2 AAPL BUY 100@$150.00 DAY |}];
+      {| [for Alice] ACCEPTED client-id=0 id=1 AAPL SELL 100@$150.00 DAY |}];
     let%bind () =
       rpc_submit
         alice
         (Harness.sell ~price_cents:10000 ~participant:Harness.alice ())
     in
     [%expect
-      {| [for Alice] REJECTED client-id=0 AAPL BUY 100@100.00 reason=ID already in use |}];
+      {| [for Alice] REJECTED client-id=0 AAPL SELL 100@$100.00 reason=client order id already exits |}];
     return ())
 ;;
 
@@ -422,7 +422,7 @@ let%expect_test "e2e: cancel an already filled order" =
     (* Alice cancels order *)
     let%bind () = rpc_cancel alice (Client_order_id.of_int 0) in
     [%expect
-      {| [for Alice] REJECTED Cancel Request client-id:0 (alice) reason=Does not exist |}];
+      {| [for Alice] REJECTED Cancel Request client-id:0 (Alice) reason=Order does not exist |}];
     return ())
 ;;
 
@@ -432,7 +432,7 @@ let%expect_test "e2e: cancel a nonexistent order" =
     (* Alice cancels order *)
     let%bind () = rpc_cancel alice (Client_order_id.of_int 0) in
     [%expect
-      {| [for Alice] REJECTED Cancel Request client-id:0 (alice) reason=Does not exist |}];
+      {| [for Alice] REJECTED Cancel Request client-id:0 (Alice) reason=Order does not exist |}];
     return ())
 ;;
 
@@ -479,7 +479,7 @@ let%expect_test "e2e: BBO update after cancel" =
     (* Bob cancels order *)
     let%bind () = rpc_cancel bob (Client_order_id.of_int 0) in
     [%expect
-      {| [for Bob] CANCELLED client_id=0 id=1 AAPL remaining=50 reason=Participant.request |}];
+      {| [for Bob] CANCELLED client_id=0 id=1 AAPL remaining=50 reason=PARTICIPANT_REQUESTED |}];
     (* Verify book state after cancel *)
     let%bind book = rpc_book bob Harness.aapl in
     print_endline (Option.value_exn book |> Book.to_string);
@@ -493,3 +493,38 @@ let%expect_test "e2e: BBO update after cancel" =
       |}];
     return ())
 ;;
+
+(* ---------------------------------------------------------------- *)
+(* Test login *)
+(* ---------------------------------------------------------------- *)
+
+(*=let%expect_test "e2e: no login before submit" =
+  with_server ~symbols:[ Harness.aapl ] (fun ~server:_ ~port ->
+    let%bind alice = connect_as_no_login ~port Harness.alice in
+    require_does_raise_async (fun () ->
+      Async.return (rpc_submit alice (Harness.buy ~price_cents:15000 ())));
+    [%expect
+      {| "Symbol.of_string: symbol must contain only alphanumeric characters" |}];
+    [%expect.unreachable];
+    return ())
+;;
+
+let%expect_test "e2e: no login before cancel" =
+  with_server ~symbols:[ Harness.aapl ] (fun ~server:_ ~port ->
+    let%bind alice = connect_as_no_login ~port Harness.alice in
+    require_does_raise_async (fun () ->
+      Async.return (rpc_cancel alice (Client_order_id.of_int 0)));
+    [%expect
+      {| "Symbol.of_string: symbol must contain only alphanumeric characters" |}];
+    [%expect.unreachable];
+    return ())
+;;
+
+let%expect_test "e2e: two clients attempt to login with the same name" =
+  with_server ~symbols:[ Harness.aapl ] (fun ~server:_ ~port ->
+    let%bind _ = connect_as ~port Harness.alice in
+    let%bind _ = connect_as ~port Harness.alice in
+    (* Bob places a sell *)
+    [%expect.unreachable];
+    return ())
+;;*)

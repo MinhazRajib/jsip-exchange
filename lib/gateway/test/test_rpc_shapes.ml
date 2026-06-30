@@ -67,8 +67,8 @@ let%expect_test "cancel-order RPC" =
        : Async_rpc_kernel.Rpc_shapes.t)];
   [%expect
     {|
-    (Rpc (query d9a8da25d5656b016fb4dbdc2e4197fb)
-     (response 9bf9d93dd466a19cac18ecff7cd287af))
+    (Rpc (query 698cfa4093fe5e51523842d37b92aeac)
+     (response 27f76252e5181aab209cd62aa6e42268))
     |}];
   return ()
 ;;

@@ -14,7 +14,6 @@ let with_server ~symbols f =
 type client = { conn : Rpc.Connection.t }
 
 let connect_as ~port _participant =
-  (* print_endline [%string "[for %{_participant#Participant}]"]; ts *)
   let where =
     Tcp.Where_to_connect.of_host_and_port { host = "localhost"; port }
   in
@@ -25,6 +24,21 @@ let connect_as ~port _participant =
       conn
       (Participant.to_string _participant)
   in
+  let%bind session_feed, _metadata =
+    Rpc.Pipe_rpc.dispatch_exn Rpc_protocol.session_feed_rpc conn ()
+  in
+  don't_wait_for
+    (Pipe.iter_without_pushback session_feed ~f:(fun event ->
+       let e = Event_formatter.format_event event in
+       print_endline [%string "[for %{_participant#Participant}] %{e}"]));
+  Async.return { conn }
+;;
+
+let connect_as_no_login ~port _participant =
+  let where =
+    Tcp.Where_to_connect.of_host_and_port { host = "localhost"; port }
+  in
+  let%bind conn = Rpc.Connection.client where >>| Result.ok_exn in
   let%bind session_feed, _metadata =
     Rpc.Pipe_rpc.dispatch_exn Rpc_protocol.session_feed_rpc conn ()
   in
