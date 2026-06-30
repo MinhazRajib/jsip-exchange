@@ -18,15 +18,23 @@ let start_bot ~where_to_connect ~oracle (Bot_spec.T spec) =
     >>| Result.map_error ~f:Error.of_exn
     >>| ok_exn
   in
+  let%bind _ =
+    Rpc.Rpc.dispatch_exn
+      Rpc_protocol.login_rpc
+      connection
+      (Participant.to_string spec.participant)
+  in
+  let%bind session_feed, (_metadata : Rpc.Pipe_rpc.Metadata.t) =
+    Rpc.Pipe_rpc.dispatch_exn Rpc_protocol.session_feed_rpc connection ()
+  in
   let submit request =
     Rpc.Rpc.dispatch_exn Rpc_protocol.submit_order_rpc connection request
   in
-  let cancel order_id =
-    return
-      (Or_error.error_s
-         [%message
-           "Scenario runner: cancel RPC not implemented yet"
-             (order_id : Order_id.t)])
+  let cancel client_order_id =
+    Rpc.Rpc.dispatch_exn
+      Rpc_protocol.cancel_order_rpc
+      connection
+      client_order_id
   in
   let bot =
     Bot_runtime.create
@@ -49,8 +57,11 @@ let start_bot ~where_to_connect ~oracle (Bot_spec.T spec) =
           connection
           spec.symbols
       in
+      let md_session_feed_pipe = Pipe.interleave [ session_feed; md_pipe ] in
       don't_wait_for
-        (let%bind () = Pipe.iter md_pipe ~f:(Bot_runtime.feed_event bot) in
+        (let%bind () =
+           Pipe.iter md_session_feed_pipe ~f:(Bot_runtime.feed_event bot)
+         in
          match%map Rpc.Pipe_rpc.close_reason metadata with
          | Rpc.Pipe_close_reason.Closed_locally
          | Rpc.Pipe_close_reason.Closed_remotely ->
