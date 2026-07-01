@@ -115,23 +115,22 @@ let update_position t ~participant ~symbol ~side ~price ~size =
 ;;
 
 let apply_fill t (fill : Fill.t) =
-  (* A fill has two counterparties: the aggressor trades on
-     [fill.aggressor_side], the resting order on the opposite side. *)
-  update_position
-    t
-    ~participant:fill.aggressor_participant
-    ~symbol:fill.symbol
-    ~side:fill.aggressor_side
-    ~price:fill.price
-    ~size:fill.size
+  let update_position_side t (fill : Fill.t) participant side =
+    update_position
+      t
+      ~participant
+      ~symbol:fill.symbol
+      ~side
+      ~price:fill.price
+      ~size:fill.size
+  in
+  update_position_side t fill fill.aggressor_participant fill.aggressor_side
   |> fun t ->
-  update_position
+  update_position_side
     t
-    ~participant:fill.resting_participant
-    ~symbol:fill.symbol
-    ~side:(Side.flip fill.aggressor_side)
-    ~price:fill.price
-    ~size:fill.size
+    fill
+    fill.resting_participant
+    (Side.flip fill.aggressor_side)
 ;;
 
 let apply_trade_report t (trade_report : Trade_report.t) =
