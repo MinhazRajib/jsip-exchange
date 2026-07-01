@@ -11,13 +11,11 @@
 open! Core
 open! Async
 open Jsip_types
-open Jsip_bot_runtime
 
 (** Configuration for the market maker. *)
 module Config : sig
   type t =
-    { participant : Participant.t
-    ; symbol : Symbol.t
+    { symbol : Symbol.t
     ; fair_value_cents : int
     (** The market maker's estimate of the true price, in cents. *)
     ; half_spread_cents : int
@@ -29,6 +27,7 @@ module Config : sig
         [fair_value +/- spread], [fair_value +/- (spread + tick)], etc. *)
     ; client_id_manager : Client_order_id.Generator.t
     (** handles client ids *)
+    ; inventory_skew_cents_per_share : int
     ; mutable inventory_counter : Size.t Symbol.Table.t
     ; mutable resting_client_order_ids :
         Order.Request.t Client_order_id.Table.t
@@ -36,4 +35,5 @@ module Config : sig
   [@@deriving sexp_of]
 end
 
-module Market_maker_bot : Jsip_bot_runtime.Bot_runtime.Bot
+module Market_maker_bot :
+  Jsip_bot_runtime.Bot_runtime.Bot with type Config.t = Config.t
