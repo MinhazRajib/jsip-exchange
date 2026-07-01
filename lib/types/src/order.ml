@@ -32,8 +32,8 @@ module Request = struct
 end
 
 type t =
-  { client_order_id : Client_order_id.t
-  ; order_id : Order_id.t
+  { order_id : Order_id.t
+  ; client_order_id : Client_order_id.t
   ; symbol : Symbol.t
   ; participant : Participant.t
   ; side : Side.t

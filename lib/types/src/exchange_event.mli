@@ -27,11 +27,6 @@ type t =
       { request : Order.Request.t
       ; reason : string
       }
-  | Cancel_reject of
-      { participant : Participant.t
-      ; client_order_id : Client_order_id.t
-      ; reason : string
-      }
   | Best_bid_offer_update of
       { symbol : Symbol.t
       ; bbo : Bbo.t
@@ -40,6 +35,11 @@ type t =
       { symbol : Symbol.t
       ; price : Price.t
       ; size : Size.t
+      }
+  | Cancel_reject of
+      { participant : Participant.t
+      ; client_order_id : Client_order_id.t
+      ; reason : string
       }
   (** A public trade print. Unlike [Fill], this contains no information about
       the participants — it is what the broader market sees. *)
