@@ -13,6 +13,7 @@ open Jsip_types
 
 val login_rpc : (String.t, Participant.t Or_error.t) Rpc.Rpc.t
 val session_feed_rpc : (unit, Exchange_event.t, Error.t) Rpc.Pipe_rpc.t
+val cancel_order_rpc : (Client_order_id.t, unit Or_error.t) Rpc.Rpc.t
 
 (** Submit an order to the exchange.
 

@@ -23,6 +23,7 @@ type t =
   | Submit of Order.Request.t
   | Book of Symbol.t
   | Subscribe of Symbol.t
+  | Cancel of Client_order_id.t
 
 let parse ?(default_participant = Participant.of_string "default") line =
   let line = String.strip line in

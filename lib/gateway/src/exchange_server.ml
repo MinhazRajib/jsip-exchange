@@ -55,6 +55,18 @@ let start ~symbols ~port () =
                  let request' = { request with participant } in
                  handle_submit ~request_writer request')
         ; Rpc.Rpc.implement
+            Rpc_protocol.cancel_order_rpc
+            (fun state client_order_id ->
+               match Connection_state.participant state with
+               | None ->
+                 Deferred.return (Or_error.error_string "Not logged in")
+               | Some participant ->
+                 let events =
+                   Matching_engine.cancel engine participant client_order_id
+                 in
+                 Dispatcher.dispatch dispatcher events;
+                 Deferred.return (Ok ()))
+        ; Rpc.Rpc.implement
             Rpc_protocol.login_rpc
             (fun state participant_name ->
                let participant_name = String.strip participant_name in
