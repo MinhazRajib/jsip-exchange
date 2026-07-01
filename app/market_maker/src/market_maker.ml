@@ -18,7 +18,7 @@ module Config = struct
   [@@deriving sexp_of]
 end
 
-(** helpers for event handling *)
+(** helpers for event handling move within *)
 let get_inventory_change (fill : Fill.t) market_participant =
   let is_aggressor =
     Participant.( = ) market_participant fill.aggressor_participant
@@ -77,10 +77,11 @@ module Market_maker_bot :
   let name = "market_maker_bot"
 
   let seed_book (config : Config.t) (context : Context.t) =
-    let submit side offset =
+    let submit (side : Side.t) offset =
       let price =
+        (* change to operator *)
         match side with
-        | Side.Buy -> Price.of_int_cents (config.fair_value_cents - offset)
+        | Buy -> Price.of_int_cents (config.fair_value_cents - offset)
         | Sell -> Price.of_int_cents (config.fair_value_cents + offset)
       in
       let request =
@@ -107,7 +108,7 @@ module Market_maker_bot :
               (msg : Error.t)]
     in
     Deferred.List.iter
-      ~how:`Parallel
+      ~how:`Parallel (* don't use parallel use max workers *)
       (List.init config.num_levels ~f:Fn.id)
       ~f:(fun level ->
         let offset = config.half_spread_cents + level in
@@ -117,8 +118,7 @@ module Market_maker_bot :
   ;;
 
   let on_start (config : Config.t) (context : Context.t) : unit Deferred.t =
-    let%bind () = seed_book config context in
-    Deferred.unit
+    seed_book config context
   ;;
 
   let on_tick (_config : Config.t) (_context : Context.t) : unit Deferred.t =
@@ -135,7 +135,7 @@ module Market_maker_bot :
     let participant = Context.participant context in
     match event with
     | Order_accept order_accept ->
-      Hashtbl.set
+      Hashtbl.set (* restrict interface -> custom module *)
         config.resting_client_order_ids
         ~key:order_accept.request.client_order_id
         ~data:order_accept.request;

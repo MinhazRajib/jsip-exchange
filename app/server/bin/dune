@@ -4,7 +4,6 @@
   jsip_types
   jsip_order_book
   jsip_gateway
-  jsip_market_maker
   async
   core)
  (preprocess

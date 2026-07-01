@@ -184,9 +184,20 @@ let%expect_test "a fill updates inventory, cancels the book, and re-quotes \
 
 (* Compute the mid of a re-quoted ladder so we can compare where successive
    skews land relative to the configured 15000 fair value. *)
-let mid_of_ladder (_requests : Order.Request.t list) : int =
-  (* TODO(human) *)
-  failwith "TODO(human): implement mid_of_ladder"
+let mid_of_ladder (requests : Order.Request.t list) : int =
+  let prices_on side =
+    List.filter_map requests ~f:(fun req ->
+      Option.some_if (Side.equal req.side side) (Price.to_int_cents req.price))
+  in
+  let best_bid = List.max_elt (prices_on Buy) ~compare:Int.compare in
+  let best_ask = List.min_elt (prices_on Sell) ~compare:Int.compare in
+  match best_bid, best_ask with
+  | Some bid, Some ask -> (bid + ask) / 2
+  | _ ->
+    raise_s
+      [%message
+        "mid_of_ladder: ladder is missing a side"
+          (requests : Order.Request.t list)]
 ;;
 
 let%expect_test "inventory skew is symmetric around fair value" =
@@ -215,6 +226,9 @@ let%expect_test "inventory skew is symmetric around fair value" =
   let%bind mid_when_short = requote_after ~fill_side:Sell in
   printf "mid when long:  %d\n" mid_when_long;
   printf "mid when short: %d\n" mid_when_short;
-  [%expect {| |}];
+  [%expect {|
+    mid when long:  14900
+    mid when short: 15100
+    |}];
   return ()
 ;;
