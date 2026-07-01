@@ -22,6 +22,30 @@ open Jsip_gateway
    of the blocks below). If a digest changes, read the diff, convince
    yourself the change was intended, then accept it with [dune promote]. *)
 
+let%expect_test "login RPC" =
+  print_s
+    [%sexp
+      (Rpc.Rpc.shapes Rpc_protocol.login_rpc : Async_rpc_kernel.Rpc_shapes.t)];
+  [%expect {|
+    (Rpc (query d9a8da25d5656b016fb4dbdc2e4197fb)
+     (response a77b3b6e3753246ce7ec1f3467c939eb))
+    |}];
+  return ()
+;;
+
+let%expect_test "cancel-order RPC" =
+  print_s
+    [%sexp
+      (Rpc.Rpc.shapes Rpc_protocol.cancel_order_rpc
+       : Async_rpc_kernel.Rpc_shapes.t)];
+  [%expect
+    {|
+    (Rpc (query 698cfa4093fe5e51523842d37b92aeac)
+     (response 27f76252e5181aab209cd62aa6e42268))
+    |}];
+  return ()
+;;
+
 let%expect_test "submit-order RPC" =
   print_s
     [%sexp
@@ -29,7 +53,7 @@ let%expect_test "submit-order RPC" =
        : Async_rpc_kernel.Rpc_shapes.t)];
   [%expect
     {|
-    (Rpc (query 3e66c214b98aaf83fe68446b8c87512a)
+    (Rpc (query accb8b9abcef75a3f4e6c35b0cb78f90)
      (response 27f76252e5181aab209cd62aa6e42268))
     |}];
   return ()
@@ -57,7 +81,7 @@ let%expect_test "market-data RPC" =
     {|
     (Streaming_rpc (query 296be80010ace497614f92952e5510c4)
      (initial_response 86ba5df747eec837f0b391dd49f33f9e)
-     (update_response 433bb29b66b02afe94a1cd264b00ab2b)
+     (update_response d347b6ae61b6b47911d52d391862b080)
      (error 52966f4a49a77bfdff668e9cc61511b3))
     |}];
   return ()
@@ -72,7 +96,7 @@ let%expect_test "audit-log RPC" =
     {|
     (Streaming_rpc (query 86ba5df747eec837f0b391dd49f33f9e)
      (initial_response 86ba5df747eec837f0b391dd49f33f9e)
-     (update_response 433bb29b66b02afe94a1cd264b00ab2b)
+     (update_response d347b6ae61b6b47911d52d391862b080)
      (error 52966f4a49a77bfdff668e9cc61511b3))
     |}];
   return ()

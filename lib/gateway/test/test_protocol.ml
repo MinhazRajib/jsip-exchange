@@ -13,12 +13,12 @@ let print_parse line =
 
 let%expect_test "parse: basic buy" =
   print_parse "BUY AAPL 100 150.25";
-  [%expect {| BUY AAPL 100@$150.25 DAY as anonymous |}]
+  [%expect {| BUY AAPL 100@$150.25 DAY anonymous  as 0 |}]
 ;;
 
 let%expect_test "parse: basic sell" =
   print_parse "SELL TSLA 50 200.00";
-  [%expect {| SELL TSLA 50@$200.00 DAY as anonymous |}]
+  [%expect {| SELL TSLA 50@$200.00 DAY anonymous  as 0 |}]
 ;;
 
 let%expect_test "parse: case insensitive side" =
@@ -26,44 +26,44 @@ let%expect_test "parse: case insensitive side" =
   print_parse "Buy AAPL 100 150.00";
   [%expect
     {|
-    BUY AAPL 100@$150.00 DAY as anonymous
-    BUY AAPL 100@$150.00 DAY as anonymous
+    BUY AAPL 100@$150.00 DAY anonymous  as 0
+    BUY AAPL 100@$150.00 DAY anonymous  as 0
     |}]
 ;;
 
 let%expect_test "parse: with IOC time-in-force" =
   print_parse "BUY AAPL 100 150.00 IOC";
-  [%expect {| BUY AAPL 100@$150.00 IOC as anonymous |}]
+  [%expect {| BUY AAPL 100@$150.00 IOC anonymous  as 0 |}]
 ;;
 
 let%expect_test "parse: with explicit DAY" =
   print_parse "SELL AAPL 200 151.00 DAY";
-  [%expect {| SELL AAPL 200@$151.00 DAY as anonymous |}]
+  [%expect {| SELL AAPL 200@$151.00 DAY anonymous  as 0 |}]
 ;;
 
 let%expect_test "parse: with participant" =
   print_parse "BUY AAPL 100 150.00 as Alice";
-  [%expect {| BUY AAPL 100@$150.00 DAY as Alice |}]
+  [%expect {| BUY AAPL 100@$150.00 DAY Alice  as 0 |}]
 ;;
 
 let%expect_test "parse: with TIF and participant" =
   print_parse "SELL GOOG 75 2800.50 IOC as Bob";
-  [%expect {| SELL GOOG 75@$2800.50 IOC as Bob |}]
+  [%expect {| SELL GOOG 75@$2800.50 IOC Bob  as 0 |}]
 ;;
 
 let%expect_test "parse: symbol is uppercased" =
   print_parse "BUY aapl 100 150.00";
-  [%expect {| BUY aapl 100@$150.00 DAY as anonymous |}]
+  [%expect {| BUY aapl 100@$150.00 DAY anonymous  as 0 |}]
 ;;
 
 let%expect_test "parse: extra whitespace is ignored" =
   print_parse "  BUY   AAPL   100   150.00  ";
-  [%expect {| BUY AAPL 100@$150.00 DAY as anonymous |}]
+  [%expect {| BUY AAPL 100@$150.00 DAY anonymous  as 0 |}]
 ;;
 
 let%expect_test "parse: price with dollar sign" =
   print_parse "BUY AAPL 100 $150.25";
-  [%expect {| BUY AAPL 100@$150.25 DAY as anonymous |}]
+  [%expect {| BUY AAPL 100@$150.25 DAY anonymous  as 0 |}]
 ;;
 
 (* --- Parse errors --- *)

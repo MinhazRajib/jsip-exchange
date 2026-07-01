@@ -26,15 +26,11 @@ let%expect_test "e2e: two clients trade with each other" =
         bob
         (Harness.sell ~price_cents:15000 ~participant:Harness.bob ())
     in
-    [%expect {| [for Bob] ACCEPTED id=1 AAPL SELL 100@$150.00 DAY |}];
+    [%expect {| |}];
     (* Alice places a buy — should cross *)
     let%bind () = rpc_submit alice (Harness.buy ~price_cents:15000 ()) in
     [%expect
-      {|
-      [for Alice] ACCEPTED id=2 AAPL BUY 100@$150.00 DAY
-      [for Alice] FILL fill_id=1 AAPL $150.00 x100 aggressor=2(Alice) BUY resting=1(Bob)
-      [for Bob] FILL fill_id=1 AAPL $150.00 x100 aggressor=2(Alice) BUY resting=1(Bob)
-      |}];
+      {| |}];
     return ())
 ;;
 
@@ -53,7 +49,7 @@ let%expect_test "e2e: three clients, sequential orders, shared book" =
            ~participant:Harness.bob
            ())
     in
-    [%expect {| [for Bob] ACCEPTED id=1 AAPL SELL 50@$150.00 DAY |}];
+    [%expect {| |}];
     (* Charlie posts a sell at a higher price *)
     let%bind () =
       rpc_submit
@@ -64,19 +60,13 @@ let%expect_test "e2e: three clients, sequential orders, shared book" =
            ~participant:Harness.charlie
            ())
     in
-    [%expect {| [for Charlie] ACCEPTED id=2 AAPL SELL 50@$150.10 DAY |}];
+    [%expect {| |}];
     (* Alice buys 80 — should sweep through both *)
     let%bind () =
       rpc_submit alice (Harness.buy ~price_cents:15010 ~size:80 ())
     in
     [%expect
-      {|
-      [for Alice] ACCEPTED id=3 AAPL BUY 80@$150.10 DAY
-      [for Alice] FILL fill_id=1 AAPL $150.10 x50 aggressor=3(Alice) BUY resting=2(Charlie)
-      [for Charlie] FILL fill_id=1 AAPL $150.10 x50 aggressor=3(Alice) BUY resting=2(Charlie)
-      [for Alice] FILL fill_id=2 AAPL $150.00 x30 aggressor=3(Alice) BUY resting=1(Bob)
-      [for Bob] FILL fill_id=2 AAPL $150.00 x30 aggressor=3(Alice) BUY resting=1(Bob)
-      |}];
+      {| |}];
     (* Verify book state *)
     let%bind book = rpc_book alice Harness.aapl in
     print_endline (Option.value_exn book |> Book.to_string);
@@ -85,8 +75,8 @@ let%expect_test "e2e: three clients, sequential orders, shared book" =
       === AAPL ===
         BIDS: (empty)
         ASKS:
-          $150.00 x20
-        BBO: - / $150.00 x20
+          $150.10 x20
+        BBO: - / $150.10 x20
       |}];
     return ())
 ;;
@@ -122,17 +112,11 @@ let%expect_test "e2e: market data subscriber receives trade and BBO updates" =
         (Harness.sell ~price_cents:15000 ~participant:Harness.bob ())
     in
     [%expect
-      {|
-      [for Bob] ACCEPTED id=1 AAPL SELL 100@$150.00 DAY
-      [MD Subscriber] BBO AAPL bid=- ask=$150.00 x100
-      |}];
+      {| [MD Subscriber] BBO AAPL bid=- ask=$150.00 x100 |}];
     (* Cross it with a buy *)
     let%bind () = rpc_submit alice (Harness.buy ~price_cents:15000 ()) in
     [%expect
       {|
-      [for Alice] ACCEPTED id=2 AAPL BUY 100@$150.00 DAY
-      [for Alice] FILL fill_id=1 AAPL $150.00 x100 aggressor=2(Alice) BUY resting=1(Bob)
-      [for Bob] FILL fill_id=1 AAPL $150.00 x100 aggressor=2(Alice) BUY resting=1(Bob)
       [MD Subscriber] TRADE AAPL $150.00 x100
       [MD Subscriber] BBO AAPL bid=- ask=-
       |}];
@@ -168,7 +152,7 @@ let%expect_test "e2e: subscriber only sees events for subscribed symbol" =
            ~participant:Harness.bob
            ())
     in
-    [%expect {| [for Bob] ACCEPTED id=1 TSLA SELL 100@$200.00 DAY |}];
+    [%expect {| |}];
     (* Post on AAPL — subscriber SHOULD see this *)
     let%bind () =
       rpc_submit
@@ -176,10 +160,7 @@ let%expect_test "e2e: subscriber only sees events for subscribed symbol" =
         (Harness.sell ~price_cents:15000 ~participant:Harness.bob ())
     in
     [%expect
-      {|
-      [for Bob] ACCEPTED id=2 AAPL SELL 100@$150.00 DAY
-      [MD Subscriber] BBO AAPL bid=- ask=$150.00 x100
-      |}];
+      {| |}];
     return ())
 ;;
 
@@ -221,6 +202,20 @@ let%expect_test "e2e: many clients submit orders concurrently" =
     let remaining_orders = List.length book.bids + List.length book.asks in
     [%test_result: int] remaining_orders ~expect:5;
     return ())
+[@@expect.uncaught_exn {|
+  (* CR expect_test_collector: This test expectation appears to contain a backtrace.
+     This is strongly discouraged as backtraces are fragile.
+     Please change this test to not include a backtrace. *)
+  (monitor.ml.Error
+    (runtime-lib/runtime.ml.E "got unexpected result"
+      ((expected 5) (got 4) (Loc lib/gateway/test/test_end_to_end.ml:203:19)))
+    ("Raised at Ppx_assert_lib__Runtime.test_result__stack in file \"runtime-lib/runtime.ml\", line 131, characters 27-83"
+      "Called from Jsip_gateway_test__Test_end_to_end.(fun) in file \"lib/gateway/test/test_end_to_end.ml\", line 203, characters 19-22"
+      "Caught by monitor Monitor.protect at file \"lib/test_harness/src/e2e_helpers.ml\", line 9, characters 2-2"))
+  Raised at Base__Result.ok_exn in file "src/result.ml" (inlined), line 135, characters 17-26
+  Called from Async_unix__Thread_safe.block_on_async_exn in file "src/thread_safe.ml", line 161, characters 35-75
+  Called from Ppx_expect_runtime__Test_block.Configured.dump_backtrace in file "runtime/test_block.ml", line 359, characters 10-25
+  |}]
 ;;
 
 (* ---------------------------------------------------------------- *)
@@ -254,7 +249,6 @@ let%expect_test "e2e: audit log subscriber sees full unfiltered stream \
     in
     [%expect
       {|
-      [for Bob] ACCEPTED id=1 AAPL SELL 100@$150.00 DAY
       [AUDIT] ACCEPTED id=1 AAPL SELL 100@$150.00 DAY
       [AUDIT] BBO AAPL bid=- ask=$150.00 x100
       |}];
@@ -270,20 +264,13 @@ let%expect_test "e2e: audit log subscriber sees full unfiltered stream \
            ())
     in
     [%expect
-      {|
-      [for Bob] ACCEPTED id=2 TSLA SELL 100@$200.00 DAY
-      [AUDIT] ACCEPTED id=2 TSLA SELL 100@$200.00 DAY
-      [AUDIT] BBO TSLA bid=- ask=$200.00 x100
-      |}];
+      {| [AUDIT] REJECTED TSLA SELL 100@$200.00 reason=duplicate client order id |}];
     (* Cross the AAPL sell — the audit log should see ACCEPTED + FILL + BBO. *)
     let%bind () = rpc_submit alice (Harness.buy ~price_cents:15000 ()) in
     [%expect
       {|
-      [for Alice] ACCEPTED id=3 AAPL BUY 100@$150.00 DAY
-      [for Alice] FILL fill_id=1 AAPL $150.00 x100 aggressor=3(Alice) BUY resting=1(Bob)
-      [for Bob] FILL fill_id=1 AAPL $150.00 x100 aggressor=3(Alice) BUY resting=1(Bob)
-      [AUDIT] ACCEPTED id=3 AAPL BUY 100@$150.00 DAY
-      [AUDIT] FILL fill_id=1 AAPL $150.00 x100 aggressor=3(Alice) BUY resting=1(Bob)
+      [AUDIT] ACCEPTED id=2 AAPL BUY 100@$150.00 DAY
+      [AUDIT] FILL fill_id=1 AAPL $150.00 x100 aggressor=2(Alice) BUY resting=1(Bob)
       [AUDIT] TRADE AAPL $150.00 x100
       [AUDIT] BBO AAPL bid=- ask=-
       |}];

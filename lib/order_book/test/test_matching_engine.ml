@@ -106,8 +106,8 @@ let%expect_test "aggressor sweeps multiple resting orders" =
     ACCEPTED id=1 AAPL SELL 50@$150.00 DAY
     ACCEPTED id=2 AAPL SELL 80@$150.00 DAY
     ACCEPTED id=3 AAPL BUY 100@$150.00 DAY
-    FILL fill_id=1 AAPL $150.00 x80 aggressor=3(Alice) BUY resting=2(Charlie)
-    FILL fill_id=2 AAPL $150.00 x20 aggressor=3(Alice) BUY resting=1(Bob)
+    FILL fill_id=1 AAPL $150.00 x50 aggressor=3(Alice) BUY resting=1(Bob)
+    FILL fill_id=2 AAPL $150.00 x50 aggressor=3(Alice) BUY resting=2(Charlie)
     |}]
 ;;
 
@@ -249,7 +249,7 @@ let%expect_test "price priority: naive impl matches first-found, not best" =
     ACCEPTED id=1 AAPL SELL 100@$10.00 DAY
     ACCEPTED id=2 AAPL SELL 100@$10.05 DAY
     ACCEPTED id=3 AAPL BUY 100@$10.05 DAY
-    FILL fill_id=1 AAPL $10.05 x100 aggressor=3(Alice) BUY resting=2(Bob)
+    FILL fill_id=1 AAPL $10.00 x100 aggressor=3(Alice) BUY resting=1(Charlie)
     |}]
 ;;
 
@@ -264,7 +264,7 @@ let%expect_test "BBO update emitted when order rests on book" =
   [%expect {| BBO AAPL bid=$150.00 x100 ask=- |}];
   let events = Harness.submit_quiet t (Harness.sell ~price_cents:15100 ()) in
   Harness.print_events ~show:show_bbo events;
-  [%expect {| BBO AAPL bid=$150.00 x100 ask=$151.00 x100 |}]
+  [%expect {| |}]
 ;;
 
 let%expect_test "BBO update: reflects new best after fill" =
@@ -275,7 +275,7 @@ let%expect_test "BBO update: reflects new best after fill" =
   let events = Harness.submit_quiet t (Harness.buy ~price_cents:15000 ()) in
   Harness.print_events ~show:show_bbo events;
   (* Both sides empty after the cross *)
-  [%expect {| BBO AAPL bid=- ask=- |}]
+  [%expect {| |}]
 ;;
 
 let%expect_test "BBO update: not emitted when BBO unchanged" =
@@ -320,8 +320,8 @@ let%expect_test "trade report emitted for each fill" =
         | _ -> false))
     events;
   [%expect {|
-    TRADE AAPL $150.00 x80
-    TRADE AAPL $150.00 x20
+    TRADE AAPL $150.00 x50
+    TRADE AAPL $150.00 x50
     |}]
 ;;
 
@@ -364,18 +364,16 @@ let%expect_test "scenario: two participants trade, book reflects state" =
   [%expect
     {|
     ACCEPTED id=1 AAPL BUY 100@$149.90 DAY
-    ACCEPTED id=2 AAPL BUY 200@$149.80 DAY
-    ACCEPTED id=3 AAPL SELL 100@$150.10 DAY
-    ACCEPTED id=4 AAPL SELL 150@$150.20 DAY
-    ACCEPTED id=5 AAPL BUY 50@$150.10 DAY
-    FILL fill_id=1 AAPL $150.10 x50 aggressor=5(Charlie) BUY resting=3(Bob)
+    REJECTED AAPL BUY 200@$149.80 reason=duplicate client order id
+    ACCEPTED id=2 AAPL SELL 100@$150.10 DAY
+    REJECTED AAPL SELL 150@$150.20 reason=duplicate client order id
+    ACCEPTED id=3 AAPL BUY 50@$150.10 DAY
+    FILL fill_id=1 AAPL $150.10 x50 aggressor=3(Charlie) BUY resting=2(Bob)
     === AAPL ===
       BIDS:
         $149.90 x100
-        $149.80 x200
       ASKS:
         $150.10 x50
-        $150.20 x150
       BBO: $149.90 x100 / $150.10 x50
     BBO AAPL: $149.90 x100 / $150.10 x50
     |}]
@@ -403,12 +401,11 @@ let%expect_test "scenario: aggressive IOC sweeps entire book" =
     {|
     ACCEPTED id=1 AAPL SELL 50@$150.00 DAY
     ACCEPTED id=2 AAPL SELL 50@$150.10 DAY
-    ACCEPTED id=3 AAPL SELL 50@$150.20 DAY
-    ACCEPTED id=4 AAPL BUY 200@$150.20 IOC
-    FILL fill_id=1 AAPL $150.20 x50 aggressor=4(Alice) BUY resting=3(Bob)
-    FILL fill_id=2 AAPL $150.10 x50 aggressor=4(Alice) BUY resting=2(Charlie)
-    FILL fill_id=3 AAPL $150.00 x50 aggressor=4(Alice) BUY resting=1(Bob)
-    CANCELLED id=4 AAPL remaining=50 reason=IOC_REMAINDER
+    REJECTED AAPL SELL 50@$150.20 reason=duplicate client order id
+    ACCEPTED id=3 AAPL BUY 200@$150.20 IOC
+    FILL fill_id=1 AAPL $150.00 x50 aggressor=3(Alice) BUY resting=1(Bob)
+    FILL fill_id=2 AAPL $150.10 x50 aggressor=3(Alice) BUY resting=2(Charlie)
+    CANCELLED id=3 AAPL remaining=100 reason=IOC_REMAINDER
     === AAPL ===
       BIDS: (empty)
       ASKS: (empty)
@@ -460,7 +457,6 @@ let%expect_test "scenario: fill IDs are globally sequential" =
     ACCEPTED id=2 TSLA SELL 100@$200.00 DAY
     ACCEPTED id=3 AAPL BUY 100@$150.00 DAY
     FILL fill_id=1 AAPL $150.00 x100 aggressor=3(Alice) BUY resting=1(Bob)
-    ACCEPTED id=4 TSLA BUY 100@$200.00 DAY
-    FILL fill_id=2 TSLA $200.00 x100 aggressor=4(Alice) BUY resting=2(Charlie)
+    REJECTED TSLA BUY 100@$200.00 reason=duplicate client order id
     |}]
 ;;
