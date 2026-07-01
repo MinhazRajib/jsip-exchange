@@ -21,12 +21,14 @@ let print_parse line =
 
 let%expect_test "parse: basic buy" =
   print_parse "BUY AAPL 100 150.25";
-  [%expect {| ERROR: expected: BUY|SELL <client_id> <symbol> <size> <price> [ DAY|IOC] [as <name>] |}]
+  [%expect
+    {| ERROR: expected: BUY|SELL <client_id> <symbol> <size> <price> [ DAY|IOC] [as <name>] |}]
 ;;
 
 let%expect_test "parse: basic sell" =
   print_parse "SELL TSLA 50 200.00";
-  [%expect {| ERROR: expected: BUY|SELL <client_id> <symbol> <size> <price> [ DAY|IOC] [as <name>] |}]
+  [%expect
+    {| ERROR: expected: BUY|SELL <client_id> <symbol> <size> <price> [ DAY|IOC] [as <name>] |}]
 ;;
 
 let%expect_test "parse: case insensitive side" =
@@ -61,17 +63,20 @@ let%expect_test "parse: with TIF and participant" =
 
 let%expect_test "parse: symbol is uppercased" =
   print_parse "BUY aapl 100\n   150.00";
-  [%expect {| ERROR: expected: BUY|SELL <client_id> <symbol> <size> <price> [ DAY|IOC] [as <name>] |}]
+  [%expect
+    {| ERROR: expected: BUY|SELL <client_id> <symbol> <size> <price> [ DAY|IOC] [as <name>] |}]
 ;;
 
 let%expect_test "parse: extra whitespace is ignored" =
   print_parse " BUY\n   AAPL 100 150.00 ";
-  [%expect {| ERROR: expected: BUY|SELL <client_id> <symbol> <size> <price> [ DAY|IOC] [as <name>] |}]
+  [%expect
+    {| ERROR: expected: BUY|SELL <client_id> <symbol> <size> <price> [ DAY|IOC] [as <name>] |}]
 ;;
 
 let%expect_test "parse: price with dollar sign" =
   print_parse "BUY AAPL\n   100 $150.25";
-  [%expect {| ERROR: expected: BUY|SELL <client_id> <symbol> <size> <price> [ DAY|IOC] [as <name>] |}]
+  [%expect
+    {| ERROR: expected: BUY|SELL <client_id> <symbol> <size> <price> [ DAY|IOC] [as <name>] |}]
 ;;
 
 (* --- Parse errors --- *)
@@ -141,7 +146,8 @@ let%expect_test "default participant: used when none specified" =
         [%string "participant=%{request.participant#Participant}"]
     | Ok _ -> print_endline "WRONG COMMAND"
   in
-  [%expect {| ERROR: expected: BUY|SELL <client_id> <symbol> <size> <price> [ DAY|IOC] [as <name>] |}]
+  [%expect
+    {| ERROR: expected: BUY|SELL <client_id> <symbol> <size> <price> [ DAY|IOC] [as <name>] |}]
 ;;
 
 let%expect_test "default participant: overridden by explicit 'as'" =
