@@ -37,6 +37,7 @@ Connected to exchange at %{host}:%{port#Int} as %{participant#Participant}
 Commands: BUY|SELL <symbol> <size> <price> [IOC|DAY]
           BOOK <symbol>
           SUBSCRIBE <symbol>  (stream market data)
+          CANCEL <client_order_id>
 
 Order acknowledgements, fills, and cancellations are temporarily printed
 by the server process; the SUBSCRIBE command attaches you to a per-symbol
@@ -94,7 +95,15 @@ Continue entering commands as normal.|}];
                (Pipe.iter_without_pushback reader ~f:(fun event ->
                   print_endline
                     [%string "[MD] %{Protocol.format_event event}"]));
-             loop ()))
+             loop ())
+        | Ok (Exchange_command.Cancel client_order_id) ->
+          let%bind.Deferred.Or_error () =
+            Rpc.Rpc.dispatch_exn
+              Rpc_protocol.cancel_order_rpc
+              conn
+              client_order_id
+          in
+          loop ())
   in
   loop ()
 ;;
