@@ -11,6 +11,7 @@
 open! Core
 open! Async
 open Jsip_types
+open Jsip_bot_runtime
 
 (** Configuration for the market maker. *)
 module Config : sig
@@ -29,19 +30,10 @@ module Config : sig
     ; client_id_manager : Client_order_id.Generator.t
     (** handles client ids *)
     ; mutable inventory_counter : Size.t Symbol.Table.t
-    ; mutable resting_client_order_ids : Size.t Client_order_id.Table.t
+    ; mutable resting_client_order_ids :
+        Order.Request.t Client_order_id.Table.t
     }
   [@@deriving sexp_of]
 end
 
-(** Submit the market maker's initial set of resting orders over the given
-    open [Rpc.Connection.t]. The connection must already be logged in as
-    [config.participant]. [submit_order_rpc] is one-way, so this function
-    only returns success/failure of the submission attempt; the actual
-    matching-engine response (acceptance, fills, rejection) arrives on the
-    participant's session feed. *)
-val seed_book : Config.t -> Rpc.Connection.t -> unit Deferred.t
-
-(** Seeds the initial ladder, subscribes the session feed and reacts to fills
-    by cancelling resting orders and reposting *)
-val run : Config.t -> Rpc.Connection.t -> unit Deferred.t
+module Market_maker_bot : Jsip_bot_runtime.Bot_runtime.Bot
