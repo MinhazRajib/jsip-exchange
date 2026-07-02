@@ -1,1 +1,1 @@
-(*_ Intentionally left blank *)
+module Cancel_storm = Cancel_storm

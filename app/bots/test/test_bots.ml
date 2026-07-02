@@ -83,6 +83,64 @@ module Inert_bot = struct
   let on_event () _ctx _event = return ()
 end
 
+let cancel_storm_config ~cycles_per_tick : Cancel_storm.Config.t =
+  { symbols = [ aapl ]
+  ; cycles_per_tick
+  ; order_size = 10
+  ; price_offset_cents = 100
+  ; client_order_ids = Client_order_id.Generator.create ()
+  }
+;;
+
+(* The storm's defining behavior: every cycle submits then cancels with a
+   *fresh* client-order id, and never crosses the market (buys rest below the
+   fundamental, sells above). We drive two ticks and check all of that against
+   hand-computed expectations, not against the bot's own bookkeeping. *)
+let%expect_test "cancel storm submits-then-cancels with fresh ids each cycle" =
+  let config = cancel_storm_config ~cycles_per_tick:3 in
+  let bot, submitted, cancelled =
+    make_recording_bot (module Cancel_storm) config ~initial_price_cents:15000 ()
+  in
+  let ctx = Bot_runtime.For_testing.context_of bot in
+  let%bind () = Cancel_storm.on_tick config ctx in
+  let%bind () = Cancel_storm.on_tick config ctx in
+  let submits = List.rev !submitted in
+  let cancels = List.rev !cancelled in
+  printf "submits: %d, cancels: %d\n" (List.length submits) (List.length cancels);
+  let submitted_ids = List.map submits ~f:(fun r -> r.client_order_id) in
+  printf
+    !"submitted ids: %{sexp: Client_order_id.t list}\n"
+    submitted_ids;
+  printf !"cancelled ids: %{sexp: Client_order_id.t list}\n" cancels;
+  printf
+    "ids all distinct: %b\n"
+    (List.contains_dup submitted_ids ~compare:Client_order_id.compare |> not);
+  printf
+    "every submit was cancelled: %b\n"
+    (List.equal
+       Client_order_id.equal
+       (List.sort submitted_ids ~compare:Client_order_id.compare)
+       (List.sort cancels ~compare:Client_order_id.compare));
+  let non_marketable =
+    List.for_all submits ~f:(fun r ->
+      let fundamental = 15000 in
+      match r.side with
+      | Buy -> Price.to_int_cents r.price < fundamental
+      | Sell -> Price.to_int_cents r.price > fundamental)
+  in
+  printf "all orders non-marketable: %b\n" non_marketable;
+  [%expect
+    {|
+    submits: 6, cancels: 6
+    submitted ids: (1 2 3 4 5 6)
+    cancelled ids: (1 2 3 4 5 6)
+    ids all distinct: true
+    every submit was cancelled: true
+    all orders non-marketable: true
+    |}];
+  return ()
+;;
+
 let%expect_test "make_recording_bot wires up a runnable bot" =
   let bot, submitted, _cancelled =
     make_recording_bot (module Inert_bot) () ()
