@@ -1,0 +1,93 @@
+[33m3567114[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m)[m Resolve conflicts, keeping
+[33m6ef9c5d[m rpc shape is matched
+[33mb20d426[m merge rpc Merge branch 'merge/shaper'
+[33m97d2ef3[m merge_rpc
+[33meff5691[m[33m ([m[1;31mshaper/main[m[33m, [m[1;31mother/main[m[33m, [m[1;32mincoming[m[33m)[m refactor: adjust interface to work with rpc
+[33m1330873[m feat:removed market maker from main, REFACTOR LATER
+[33m7643661[m[33m ([m[1;31morigin/pnl-with[m[33m, [m[1;31morigin/merge/shaper[m[33m, [m[1;32mpnl-with[m[33m, [m[1;32mmerge_rpc_shape[m[33m, [m[1;32mmerge/shaper[m[33m)[m before changing rpc shape
+[33m932df6f[m feat: added pnl feature with testing
+[33m1e112d3[m feat: migrated market maker features into market maker bot
+[33m45e323d[m P&L, with CLAUDE.md
+[33m2b25146[m P&L, with CLAUDE.md
+[33m82e41fe[m[33m ([m[1;31morigin/matching-rpc-shape[m[33m)[m git fetch upstream        # get the latest commits from the original repo git merge upstream/main   # merge them into your local main git push origin main      # push the result back to your fork
+[33m7ac3df2[m before 2a starting 3 and setting up claude
+[33mee8b166[m Add cancel order functionality to RPC and command modules
+[33m288770d[m Merge branch 'jane-street-immersion-program:main' into main
+[33mffebeaf[m feat: moved functionality from market_maker into market_maker bot
+[33m6badd82[m[33m ([m[1;31mupstream/main[m[33m)[m ai intro, part 3 exercises and claude code files
+[33m52c7974[m 1f done, matching engine canceling and cancel rejecting
+[33mb9e3669[m feat: adjusted infra to use client order id instead of order_id
+[33m0055cde[m feat: implemented data structures for status tracking in market maker
+[33m14eb674[m 1f done: Add client order ID tracking to prevent duplicates in order submissions
+[33mac09ba5[m feat: Added test cases to handle cancel order and login functionality
+[33m0e2c072[m fix: Added values to pipe
+[33m88111b5[m feat: Added cancel order rpc
+[33mc55c67c[m feat: implemented cancel feature in matching engine
+[33ma1dabfd[m exercise 1d done
+[33md34bd25[m refactor: adjusted test cases to work with client_order_id
+[33m95436d6[m fix: made matching engine properly detect duplicates, refactored storage to a participant client_id table
+[33mf97074f[m 1d (working on it i think)
+[33mb00ac22[m feat: added duplicate detection s.t. a request for a participant with a repeated client_order_id will be rejected
+[33m670fb94[m feat: added client_order_id handling to tests and bots, default client_order_id is 0
+[33mac0e87e[m feat: Added client_order_id as a field to regular order
+[33mf0e7e84[m feat: Adapted formatters and event to contain client_id
+[33m409d209[m fix: removed unneeded client order id getter from order interface, client order id exists in order request interface
+[33m8c62b33[m feat: Added client_order_id module and added to Order.Request
+[33m0f8e456[m fix: fixed allocation of initial state users each have an independent instance of connection state
+[33mcebfb4d[m fix: Fixed ordering of conditional in log in s.t. default is not an error
+[33mbac48e7[m fix: Fixed variable allocation s.t. there is no longer multiple instances of values
+[33ma6b1bff[m feat: added session feed RPC to display feed context
+[33m359781b[m fix: Fixed test checking exchange command capitalization behavior
+[33m48c8630[m feat: completed implementation of login and login session state tracking in gateway
+[33m1991657[m fix: Fixed bug when combining values from reverse_index map
+[33m8974a35[m part 10
+[33m6b636f0[m refactor: combined separate reverse indexes into a single section
+[33m76522de[m exercise 8 done
+[33m4b33a33[m feat: Added participant table and session handling in Dispatch
+[33mf0c9239[m feat: Adjusted order book behavior s.t. the best option occurs first
+[33m0cf7d60[m Revert "fix: adjusted expected test behavior s.t. best bid/ask occurs first"
+[33m258d83f[m feat: added additional dispatcher components
+[33ma8bb12a[m docs: adjusted documents to account for completed exercises
+[33me4e42d3[m fix: fixed behavior of best bids to properly consider first occuring order_id
+[33mf7154ea[m feat: completed participant view feature in fills and tested for correctness
+[33m115491a[m feat: implemented symbol checking for symbol type, alphanumeric inputs are automatically capitalized
+[33mcb46edd[m fix: adjusted expected test behavior s.t. best bid/ask occurs first
+[33m6ce49de[m feat: adapted internal order_book list into a map
+[33m8a79d76[m Merge remote-tracking branch 'upstream/main'
+[33md076699[m abt to start part 8
+[33m7d41ff0[m refactor: cleaned up comments and formatting on exchange_command related files
+[33m63c87cc[m refactor: moved parse calls from original protocol file, changed to event_formatter
+[33m96f69e2[m feat: Completed and tested new implementation exchange_command
+[33m67b0962[m Merge branch 'jane-street-immersion-program:main' into main
+[33ma97353e[m feat: added initial files for exchange command implementations
+[33mbb34e74[m part 2 exercises
+[33mb0ae15c[m rename week 1 exercises to part 1
+[33mbd2dc1b[m removed unneeded comment
+[33m1b9690c[m exercise 1
+[33mf9bb4b3[m fix: patched improper equality in snapshot side
+[33m594fb6a[m feat: corrected test outputs in order book
+[33mc2bd323[m Merge branch 'jane-street-immersion-program:main' into main
+[33m1a943e6[m feat: added best price and order_book implementations
+[33m9dc84af[m feat: completed and tested more aggressive and marketable features
+[33m134b200[m Merge branch 'jane-street-immersion-program:main' into main
+[33m0f1d019[m Mark some week 1 exercises as optional
+[33m4149797[m Test push to Github
+[33ma51b503[m Test push to Github
+[33m9793ef0[m clean up opam download cache in docker image to keep size down
+[33ma5954bb[m automatically create the gh-pages branch if it doesn't exist
+[33m427ad03[m publish benchmarks as a gh-pages chart
+[33m69bdcc9[m add benchmarks to CI
+[33m5424560[m revert incorrect formatting
+[33mad2b1d2[m add autoconf dependency
+[33mbca2084[m fix dockerfile opam setup
+[33m195841d[m run CI via docker image to cache dependencies
+[33mc100d4d[m reverting test error
+[33m94d0424[m testing CI test and format failures
+[33me93fced[m committing typo to test CI build failure
+[33m0fd43a4[m extending dependencies to include week 3 requirements
+[33m5446074[m trying out CI
+[33m96b6dab[m replace let%test_unit with let%expect_test, update readme, and remove instructions to build odoc since that doesn't work nicely over ssh
+[33m45ec9c4[m adding gitignore
+[33m43b5f75[m adding .ocamlformat
+[33md8b3ef0[m make overview the readme
+[33mc79ab08[m initial import

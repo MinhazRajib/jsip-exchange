@@ -24,7 +24,7 @@ let%expect_test "config builds and round-trips through sexp" =
   print_s [%sexp (make_config () : Config.t)];
   [%expect
     {|
-    ((participant Market_Maker) (symbol AAPL) (fair_value_cents 15000)
+    ((participant MarketMaker) (symbol AAPL) (fair_value_cents 15000)
      (half_spread_cents 10) (size_per_level 100) (num_levels 3))
     |}]
 ;;
