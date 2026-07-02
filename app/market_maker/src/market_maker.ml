@@ -1,195 +1,222 @@
 open! Core
 open! Async
 open Jsip_types
+open Jsip_gateway
 
 module Config = struct
   type t =
-    { symbol : Symbol.t
+    { participant : Participant.t
+    ; symbol : Symbol.t
     ; fair_value_cents : int
     ; half_spread_cents : int
     ; size_per_level : int
     ; num_levels : int
-    ; client_id_manager : Client_order_id.Generator.t
-    ; inventory_skew_cents_per_share : int
-    ; mutable inventory_counter : Size.t Symbol.Table.t
-    ; mutable resting_client_order_ids :
-        Order.Request.t Client_order_id.Table.t
     }
   [@@deriving sexp_of]
 end
 
-(** helpers for event handling move within *)
-let get_inventory_change (fill : Fill.t) market_participant =
-  let is_aggressor =
-    Participant.( = ) market_participant fill.aggressor_participant
-  in
-  match fill.aggressor_side with
-  | Buy -> if is_aggressor then fill.size else Size.( * ) fill.size (-1)
-  | Sell -> if is_aggressor then Size.( * ) fill.size (-1) else fill.size
-;;
-
-let get_client_order_id (fill : Fill.t) market_participant =
-  let is_aggressor =
-    Participant.( = ) market_participant fill.aggressor_participant
-  in
-  if is_aggressor
-  then fill.aggressor_client_order_id
-  else fill.resting_client_order_id
-;;
-
-let cancel_symbol_orders
-  (fill : Fill.t)
-  (resting_orders : Order.Request.t Client_order_id.Table.t)
-  cancel_function
-  =
-  let ids_to_cancel =
-    Hashtbl.filteri resting_orders ~f:(fun ~key:_ ~data ->
-      Symbol.( = ) fill.symbol data.symbol)
-    |> Hashtbl.keys
-  in
-  Deferred.List.iter ~how:`Parallel ids_to_cancel ~f:(fun client_order_id ->
-    match%bind cancel_function client_order_id with
-    | Ok () -> Deferred.unit
+let seed_book (config : Config.t) conn =
+  let submit request =
+    let%map result =
+      Rpc.Rpc.dispatch_exn Rpc_protocol.submit_order_rpc conn request
+    in
+    match result with
+    | Ok () -> ()
     | Error msg ->
       [%log.error
-        "market_maker: cancel failed"
-          (client_order_id : Client_order_id.t)
-          (msg : Error.t)];
+        "market_maker: submit failed"
+          (request : Order.Request.t)
+          (msg : Error.t)]
+  in
+  Deferred.List.iter
+    ~how:`Parallel
+    (List.init config.num_levels ~f:Fn.id)
+    ~f:(fun level ->
+      let offset = config.half_spread_cents + level in
+      let%bind () =
+        submit
+          ({ symbol = config.symbol
+           ; participant = config.participant
+           ; side = Buy
+           ; price = Price.of_int_cents (config.fair_value_cents - offset)
+           ; size = Size.of_int config.size_per_level
+           ; time_in_force = Day
+           ; client_order_id = Client_order_id.of_int 0
+           }
+           : Order.Request.t)
+      and () =
+        submit
+          ({ symbol = config.symbol
+           ; participant = config.participant
+           ; side = Sell
+           ; price = Price.of_int_cents (config.fair_value_cents + offset)
+           ; size = Size.of_int config.size_per_level
+           ; time_in_force = Day
+           ; client_order_id = Client_order_id.of_int 0
+           }
+           : Order.Request.t)
+      in
       Deferred.unit)
 ;;
 
-let get_skew (config : Config.t) (symbol : Symbol.t) =
-  let symbol_inventory =
-    Size.to_int (Hashtbl.find_exn config.inventory_counter symbol)
-  in
-  config.fair_value_cents
-  - (symbol_inventory * config.inventory_skew_cents_per_share)
+(* --- Dynamic market maker (Exercise 2) -------------------------------- *)
+
+(* One order we currently believe is resting on the book.
+
+   We key these by the exchange-assigned [Order_id.t], because that is what
+   [Fill] and [Order_cancel] events reference. But we also remember the
+   [client_order_id] we chose ourselves, because the cancel RPC identifies an
+   order by its *client* id, not its exchange id. [Order_accept] is the only
+   event that shows us both ids together, so that is where we learn the
+   pairing. *)
+module Resting_order = struct
+  type t =
+    { client_order_id : Client_order_id.t
+    ; symbol : Symbol.t
+    ; mutable remaining_size : Size.t
+    }
+  [@@deriving sexp_of]
+end
+
+(* All the mutable state a running market maker carries. Kept out of the
+   [.mli]: callers only ever see [run]. *)
+type t =
+  { config : Config.t
+  ; conn : Rpc.Connection.t
+  ; client_order_ids : Client_order_id.Generator.t
+  ; resting_orders : Resting_order.t Order_id.Table.t
+  ; inventory : int Symbol.Table.t
+  }
+
+(* Our net position in [symbol] moves by [+size] when we buy and [-size] when
+   we sell. [Side.sign] is exactly that (+1 for Buy, -1 for Sell), so the
+   whole update is one multiply. *)
+let apply_fill_to_inventory t ~symbol ~(side : Side.t) ~size =
+  let delta = Side.sign side * Size.to_int size in
+  Hashtbl.update t.inventory symbol ~f:(function
+    | None -> delta
+    | Some current -> current + delta)
 ;;
 
-module Market_maker_bot :
-  Jsip_bot_runtime.Bot_runtime.Bot with type Config.t = Config.t = struct
-  module Config = struct
-    type t = Config.t
-  end
+let handle_fill t (fill : Fill.t) =
+  let me = t.config.participant in
+  (* A fill always has two sides. Work out which one (if either) is us, and
+     which side we traded. If we were the aggressor, our side is
+     [aggressor_side]; if we were the resting order, we traded the opposite
+     side. Self-trade prevention means we can never be both at once. *)
+  let ours =
+    if Participant.equal fill.aggressor_participant me
+    then Some (fill.aggressor_side, fill.aggressor_order_id)
+    else if Participant.equal fill.resting_participant me
+    then Some (Side.flip fill.aggressor_side, fill.resting_order_id)
+    else None
+  in
+  match ours with
+  | None -> ()
+  | Some (side, order_id) ->
+    apply_fill_to_inventory t ~symbol:fill.symbol ~side ~size:fill.size;
+    (* Reduce the remaining size of the order this fill hit. If nothing is
+       left, the order is gone from the book, so drop it from our map. *)
+    (match Hashtbl.find t.resting_orders order_id with
+     | None -> ()
+     | Some resting ->
+       let remaining = Size.( - ) resting.remaining_size fill.size in
+       if Size.to_int remaining <= 0
+       then Hashtbl.remove t.resting_orders order_id
+       else resting.remaining_size <- remaining)
+;;
 
-  open Jsip_bot_runtime.Bot_runtime
+let handle_event t (event : Exchange_event.t) =
+  match event with
+  | Order_accept { order_id; request } ->
+    Hashtbl.set
+      t.resting_orders
+      ~key:order_id
+      ~data:
+        { Resting_order.client_order_id = request.client_order_id
+        ; symbol = request.symbol
+        ; remaining_size = request.size
+        }
+  | Fill fill -> handle_fill t fill
+  | Order_cancel { order_id; _ } -> Hashtbl.remove t.resting_orders order_id
+  | Order_reject { request; reason } ->
+    [%log.error
+      "market_maker: order rejected"
+        (request : Order.Request.t)
+        (reason : string)]
+  | Cancel_reject { client_order_id; reason; participant = _ } ->
+    [%log.error
+      "market_maker: cancel rejected"
+        (client_order_id : Client_order_id.t)
+        (reason : string)]
+  | Best_bid_offer_update _ | Trade_report _ -> ()
+;;
 
-  let name = "market_maker_bot"
+(* Submit one order over the connection, logging any submission failure. *)
+let submit t (request : Order.Request.t) =
+  let%map result =
+    Rpc.Rpc.dispatch_exn Rpc_protocol.submit_order_rpc t.conn request
+  in
+  match result with
+  | Ok () -> ()
+  | Error msg ->
+    [%log.error
+      "market_maker: submit failed"
+        (request : Order.Request.t)
+        (msg : Error.t)]
+;;
 
-  let seed_book (config : Config.t) (context : Context.t) =
-    let submit (side : Side.t) offset =
-      let price =
-        (* change to operator *)
-        match side with
-        | Buy -> Price.of_int_cents (config.fair_value_cents - offset)
-        | Sell -> Price.of_int_cents (config.fair_value_cents + offset)
+(* Place the initial ladder, just like [seed_book], but hand every order a
+   fresh [client_order_id] from the generator so we can cancel it later. We
+   record nothing here: the [Order_accept] events that come back on the
+   session feed are what populate [resting_orders]. *)
+let seed_ladder t =
+  let config = t.config in
+  Deferred.List.iter
+    ~how:`Parallel
+    (List.init config.num_levels ~f:Fn.id)
+    ~f:(fun level ->
+      let offset = config.half_spread_cents + level in
+      let order ~(side : Side.t) ~price_cents : Order.Request.t =
+        { symbol = config.symbol
+        ; participant = config.participant
+        ; side
+        ; price = Price.of_int_cents price_cents
+        ; size = Size.of_int config.size_per_level
+        ; time_in_force = Day
+        ; client_order_id =
+            Client_order_id.of_int (Client_order_id.Generator.next t.client_order_ids)
+        }
       in
-      let request =
-        ({ client_order_id =
-             Client_order_id.of_int
-               (Client_order_id.Generator.next config.client_id_manager)
-         ; symbol = config.symbol
-         ; participant = Context.participant context
-         ; side
-         ; price
-         ; size = Size.of_int config.size_per_level
-         ; time_in_force = Day
-         }
-         : Order.Request.t)
-      in
-      let%bind result = (Context.submit context) request in
-      match result with
-      | Ok () -> Async.return ()
-      | Error msg ->
-        Async.return
-          [%log.error
-            "market_maker: submit failed"
-              (request : Order.Request.t)
-              (msg : Error.t)]
-    in
-    Deferred.List.iter
-      ~how:`Parallel (* don't use parallel use max workers *)
-      (List.init config.num_levels ~f:Fn.id)
-      ~f:(fun level ->
-        let offset = config.half_spread_cents + level in
-        let%bind () = submit Buy offset
-        and () = submit Sell offset in
-        Deferred.unit)
-  ;;
-
-  let on_start (config : Config.t) (context : Context.t) : unit Deferred.t =
-    seed_book config context
-  ;;
-
-  let on_tick (_config : Config.t) (_context : Context.t) : unit Deferred.t =
-    (* only requotes in response to fill *)
-    Deferred.unit
-  ;;
-
-  let on_event
-    (config : Config.t)
-    (context : Context.t)
-    (event : Exchange_event.t)
-    : unit Deferred.t
-    =
-    let participant = Context.participant context in
-    match event with
-    | Order_accept order_accept ->
-      Hashtbl.set (* restrict interface -> custom module *)
-        config.resting_client_order_ids
-        ~key:order_accept.request.client_order_id
-        ~data:order_accept.request;
-      Deferred.unit
-    | Order_cancel order_cancel ->
-      Hashtbl.remove
-        config.resting_client_order_ids
-        order_cancel.client_order_id;
-      Deferred.unit
-    | Fill fill ->
-      let inventory_change = get_inventory_change fill participant in
-      (match Hashtbl.find config.inventory_counter fill.symbol with
-       | Some value ->
-         let new_inventory = Size.( + ) inventory_change value in
-         Hashtbl.set
-           config.inventory_counter
-           ~key:fill.symbol
-           ~data:new_inventory
-       | None ->
-         Hashtbl.set
-           config.inventory_counter
-           ~key:fill.symbol
-           ~data:inventory_change);
-      (* remove order if whole order size is consumed *)
-      let client_order_id = get_client_order_id fill participant in
-      (match
-         Hashtbl.find config.resting_client_order_ids client_order_id
-       with
-       | Some client_order_request ->
-         (* remove if fully filled, reduce size if partial fill *)
-         if Size.( = ) fill.size client_order_request.size
-         then Hashtbl.remove config.resting_client_order_ids client_order_id
-         else
-           Hashtbl.set
-             config.resting_client_order_ids
-             ~key:client_order_id
-             ~data:
-               { client_order_request with
-                 size = Size.( - ) client_order_request.size fill.size
-               }
-       | None -> ());
-      (* react to fills *)
       let%bind () =
-        cancel_symbol_orders
-          fill
-          config.resting_client_order_ids
-          (Context.cancel context)
+        submit
+          t
+          (order ~side:Buy ~price_cents:(config.fair_value_cents - offset))
+      and () =
+        submit
+          t
+          (order ~side:Sell ~price_cents:(config.fair_value_cents + offset))
       in
-      let new_config =
-        { config with fair_value_cents = get_skew config fill.symbol }
-      in
-      seed_book new_config context
-    | Order_reject _ | Cancel_reject _ | Best_bid_offer_update _
-    | Trade_report _ ->
-      Deferred.unit
-  ;;
-end
+      Deferred.unit)
+;;
+
+let run (config : Config.t) conn =
+  let t =
+    { config
+    ; conn
+    ; client_order_ids = Client_order_id.Generator.create ()
+    ; resting_orders = Order_id.Table.create ()
+    ; inventory = Symbol.Table.create ()
+    }
+  in
+  (* Subscribe to the session feed *before* seeding, so we don't miss the
+     [Order_accept] (and possibly [Fill]) events produced by our own initial
+     orders. *)
+  let%bind session_feed, _metadata =
+    Rpc.Pipe_rpc.dispatch_exn Rpc_protocol.session_feed_rpc conn ()
+  in
+  don't_wait_for
+    (Pipe.iter_without_pushback session_feed ~f:(handle_event t));
+  let%bind () = seed_ladder t in
+  Deferred.never ()
+;;

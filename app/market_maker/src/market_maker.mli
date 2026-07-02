@@ -5,8 +5,9 @@
     two prices, but take risk if the market moves against their inventory.
 
     This bot places a fixed set of resting orders on both sides of the book
-    around a configured "fair value" price. It does not dynamically adjust
-    its quotes in response to fills -- that is left as an extension. *)
+    around a configured "fair value" price. {!seed_book} places the initial
+    ladder and returns; {!run} keeps going, tracking its own fills and
+    inventory. *)
 
 open! Core
 open! Async
@@ -15,7 +16,11 @@ open Jsip_types
 (** Configuration for the market maker. *)
 module Config : sig
   type t =
-    { symbol : Symbol.t
+    { participant : Participant.t
+    (** The participant identity the bot quotes under. The connection passed
+        to {!seed_book} / {!run} must already be logged in as this
+        participant. *)
+    ; symbol : Symbol.t
     ; fair_value_cents : int
     (** The market maker's estimate of the true price, in cents. *)
     ; half_spread_cents : int
@@ -25,15 +30,28 @@ module Config : sig
     ; num_levels : int
     (** Number of price levels on each side. The bot places orders at
         [fair_value +/- spread], [fair_value +/- (spread + tick)], etc. *)
-    ; client_id_manager : Client_order_id.Generator.t
-    (** handles client ids *)
-    ; inventory_skew_cents_per_share : int
-    ; mutable inventory_counter : Size.t Symbol.Table.t
-    ; mutable resting_client_order_ids :
-        Order.Request.t Client_order_id.Table.t
     }
   [@@deriving sexp_of]
 end
 
-module Market_maker_bot :
-  Jsip_bot_runtime.Bot_runtime.Bot with type Config.t = Config.t
+(** Submit the market maker's initial set of resting orders over the given
+    open [Rpc.Connection.t] and return. The connection must already be logged
+    in as [config.participant]. This is the static behaviour: it does not
+    subscribe to the session feed or track fills — see {!run} for that. *)
+val seed_book : Config.t -> Rpc.Connection.t -> unit Deferred.t
+
+(** Run the market maker as a long-lived bot over the given open, logged-in
+    [Rpc.Connection.t].
+
+    Unlike {!seed_book}, which places the initial ladder and returns, [run]
+    keeps going. It subscribes to the participant's session feed and, as
+    [Order_accept], [Fill], and [Order_cancel] events arrive, maintains its
+    own view of
+
+    - its net {e inventory} (position) in each symbol — up on buys, down on
+      sells — and
+    - the orders it currently has resting on the book.
+
+    The returned [Deferred.t] is never determined: the bot runs until the
+    connection closes or the process exits. *)
+val run : Config.t -> Rpc.Connection.t -> unit Deferred.t
