@@ -20,6 +20,10 @@
     This bot satisfies {!Jsip_bot_runtime.Bot_runtime.Bot}. The companion
     scenario is [Jsip_scenarios.Cancel_storm]. *)
 
+(* This ".mli" file is the public "menu" for the bot: it lists the names,
+   types, and docs that other code is allowed to use. The matching ".ml" file
+   holds the actual code. Anything not listed here stays private. *)
+
 open! Core
 open! Async
 open Jsip_types
@@ -52,6 +56,9 @@ module Config : sig
   [@@deriving sexp_of]
 end
 
+(* Every bot must provide these. The runtime calls them for us: [on_start]
+   once at the beginning, [on_tick] on a timer, and [on_event] each time the
+   exchange sends a message. *)
 val name : string
 val on_start : Config.t -> Jsip_bot_runtime.Bot_runtime.Context.t -> unit Deferred.t
 val on_tick : Config.t -> Jsip_bot_runtime.Bot_runtime.Context.t -> unit Deferred.t
