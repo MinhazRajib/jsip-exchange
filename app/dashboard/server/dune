@@ -1,0 +1,13 @@
+(library
+ (name jsip_dashboard_server)
+ (public_name jsip-exchange.jsip_dashboard_server)
+ (libraries
+  core
+  async
+  jsip_types
+  jsip_gateway
+  jsip_dashboard_protocol
+  cohttp-async
+  async_rpc_websocket)
+ (preprocess
+  (pps ppx_jane)))

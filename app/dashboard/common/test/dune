@@ -1,0 +1,6 @@
+(library
+ (name jsip_dashboard_common_test)
+ (libraries core jsip_dashboard_common jsip_dashboard_protocol)
+ (inline_tests)
+ (preprocess
+  (pps ppx_jane)))

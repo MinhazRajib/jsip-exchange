@@ -1,0 +1,7 @@
+(executable
+ (name main)
+ (public_name jsip-dashboard-server)
+ (package jsip-exchange)
+ (libraries core async jsip_dashboard_server core_unix.command_unix)
+ (preprocess
+  (pps ppx_jane)))
