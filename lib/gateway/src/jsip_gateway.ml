@@ -1,4 +1,5 @@
 module Event_formatter = Event_formatter
+module Exchange_stats = Exchange_stats
 module Rpc_protocol = Rpc_protocol
 module Session = Session
 module Dispatcher = Dispatcher

@@ -355,6 +355,56 @@ let%expect_test "dispatcher: closing a subscriber's reader removes the \
 ;;
 
 (* ---------------------------------------------------------------- *)
+(* Stats feed subscription *)
+(* ---------------------------------------------------------------- *)
+
+let%expect_test "e2e: stats feed reports live book depth for a resting order" =
+  with_server ~symbols:[ Harness.aapl ] (fun ~server:_ ~port ->
+    let%bind alice = connect_as ~port Harness.alice in
+    (* Post a resting sell so AAPL's book is non-empty. *)
+    let%bind () =
+      rpc_submit
+        alice
+        (Harness.sell ~price_cents:15000 ~participant:Harness.alice ())
+    in
+    (* Swallow the placeholder [for Alice] ACCEPTED stdout trace; this test is
+       about the stats feed, not the session feed. *)
+    let (_ : string) = [%expect.output] in
+    let%bind result =
+      Rpc.Pipe_rpc.dispatch Rpc_protocol.stats_feed_rpc (connection alice) ()
+    in
+    let reader =
+      match result with
+      | Ok (Ok (reader, _id)) -> reader
+      | _ -> failwith "subscribe failed"
+    in
+    (* The driver publishes once a second; read the first snapshot it sends.
+       We assert only the deterministic book-depth pane — memory and latency
+       numbers are nondeterministic, so we don't pin them here. *)
+    let%bind snapshot = Pipe.read reader in
+    (match snapshot with
+     | `Eof -> print_endline "no snapshot received"
+     | `Ok snapshot ->
+       let aapl =
+         List.find_exn
+           snapshot.Exchange_stats.Snapshot.books
+           ~f:(fun book -> Symbol.equal book.symbol Harness.aapl)
+       in
+       print_s
+         [%message
+           "AAPL depth"
+             ~total_ask_size:(aapl.total_ask_size : Size.t)
+             ~ask_count:(aapl.ask_count : int)
+             ~total_bid_size:(aapl.total_bid_size : Size.t)
+             ~bid_count:(aapl.bid_count : int)]);
+    [%expect {|
+      ("AAPL depth" (total_ask_size 100) (ask_count 1) (total_bid_size 0)
+       (bid_count 0))
+      |}];
+    return ())
+;;
+
+(* ---------------------------------------------------------------- *)
 (* Client cancels *)
 (* ---------------------------------------------------------------- *)
 
