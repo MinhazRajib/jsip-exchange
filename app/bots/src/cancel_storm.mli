@@ -60,8 +60,16 @@ end
    once at the beginning, [on_tick] on a timer, and [on_event] each time the
    exchange sends a message. *)
 val name : string
-val on_start : Config.t -> Jsip_bot_runtime.Bot_runtime.Context.t -> unit Deferred.t
-val on_tick : Config.t -> Jsip_bot_runtime.Bot_runtime.Context.t -> unit Deferred.t
+
+val on_start
+  :  Config.t
+  -> Jsip_bot_runtime.Bot_runtime.Context.t
+  -> unit Deferred.t
+
+val on_tick
+  :  Config.t
+  -> Jsip_bot_runtime.Bot_runtime.Context.t
+  -> unit Deferred.t
 
 val on_event
   :  Config.t

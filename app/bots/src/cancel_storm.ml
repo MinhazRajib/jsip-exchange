@@ -7,8 +7,8 @@ open Jsip_types
 (* A shorter nickname for a long module name, so we can just write [Context]. *)
 module Context = Jsip_bot_runtime.Bot_runtime.Context
 
-(* The settings for this bot. The scenario fills these in.
-   Each field is explained in cancel_storm.mli. *)
+(* The settings for this bot. The scenario fills these in. Each field is
+   explained in cancel_storm.mli. *)
 module Config = struct
   type t =
     { symbols : Symbol.t list
@@ -53,9 +53,9 @@ let submit_then_cancel (config : Config.t) ctx =
   in
   (* Randomly choose to buy or sell. *)
   let side : Side.t = if Splittable_random.bool rng then Buy else Sell in
-  (* Get a fresh, never-used-before order id.
-     This matters: the exchange rejects an id it has seen before, so reusing
-     one would block all our later orders. *)
+  (* Get a fresh, never-used-before order id. This matters: the exchange
+     rejects an id it has seen before, so reusing one would block all our
+     later orders. *)
   let client_order_id =
     Client_order_id.of_int
       (Client_order_id.Generator.next config.client_order_ids)
@@ -75,9 +75,9 @@ let submit_then_cancel (config : Config.t) ctx =
     ; time_in_force = Day
     }
   in
-  (* Send the order and wait for it to be accepted.
-     ("match%bind" means: wait for the result, then look at it.)
-     We wait first so the cancel comes AFTER the order, not before it. *)
+  (* Send the order and wait for it to be accepted. ("match%bind" means: wait
+     for the result, then look at it.) We wait first so the cancel comes
+     AFTER the order, not before it. *)
   match%bind Context.submit ctx request with
   | Error err ->
     (* Sending failed. Log it and stop this step. *)
@@ -102,8 +102,8 @@ let submit_then_cancel (config : Config.t) ctx =
 let on_start (_ : Config.t) _ctx = return ()
 
 (* Runs over and over on a timer. Each time, we fire off many
-   submit-then-cancel steps at once. That burst is what stresses the exchange.
-   (One step per timer tick would be too gentle to be a "storm".) *)
+   submit-then-cancel steps at once. That burst is what stresses the
+   exchange. (One step per timer tick would be too gentle to be a "storm".) *)
 let on_tick (config : Config.t) ctx =
   (* Make a list [0; 1; 2; ...] with one entry per step, then run a step for
      each entry, all at the same time. *)
@@ -130,6 +130,7 @@ let on_event (_ : Config.t) _ctx (event : Exchange_event.t) =
          (reason : string)]
    (* We don't act on these; just ignore them. *)
    | Order_accept _ | Order_cancel _ | Fill _ | Best_bid_offer_update _
-   | Trade_report _ -> ());
+   | Trade_report _ ->
+     ());
   return ()
 ;;

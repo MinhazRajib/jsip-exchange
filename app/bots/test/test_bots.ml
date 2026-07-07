@@ -97,15 +97,20 @@ let cancel_storm_config ~cycles_per_tick : Cancel_storm.Config.t =
 (* This test checks the three things the bot must get right:
    1. every order gets a brand-new id (no repeats),
    2. every order we send, we also cancel,
-   3. no order is priced to actually trade (buys below, sells above).
-   We work these out by hand and compare, instead of trusting the bot. *)
-let%expect_test "cancel storm submits-then-cancels with fresh ids each cycle" =
+   3. no order is priced to actually trade (buys below, sells above). We work
+      these out by hand and compare, instead of trusting the bot. *)
+let%expect_test "cancel storm submits-then-cancels with fresh ids each cycle"
+  =
   (* 3 steps per tick. *)
   let config = cancel_storm_config ~cycles_per_tick:3 in
   (* A fake bot: instead of talking to a real exchange, it just records every
      order it submits and every id it cancels into these two lists. *)
   let bot, submitted, cancelled =
-    make_recording_bot (module Cancel_storm) config ~initial_price_cents:15000 ()
+    make_recording_bot
+      (module Cancel_storm)
+      config
+      ~initial_price_cents:15000
+      ()
   in
   let ctx = Bot_runtime.For_testing.context_of bot in
   (* Fire the timer twice: 3 steps + 3 steps = 6 orders expected. *)
@@ -114,7 +119,10 @@ let%expect_test "cancel storm submits-then-cancels with fresh ids each cycle" =
   (* The lists are recorded newest-first, so reverse them back to time order. *)
   let submits = List.rev !submitted in
   let cancels = List.rev !cancelled in
-  printf "submits: %d, cancels: %d\n" (List.length submits) (List.length cancels);
+  printf
+    "submits: %d, cancels: %d\n"
+    (List.length submits)
+    (List.length cancels);
   (* Pull just the ids out of each submitted order. *)
   let submitted_ids = List.map submits ~f:(fun r -> r.client_order_id) in
   printf !"submitted ids: %{sexp: Client_order_id.t list}\n" submitted_ids;

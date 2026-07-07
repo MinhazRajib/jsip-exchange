@@ -37,9 +37,9 @@ let oracle_config : Fundamental_oracle.Config.t =
     ]
 ;;
 
-(* Build one cancel-storm bot. Each one gets its own name, random seed, and id
-   generator, so the copies run independently. 50 steps every 100ms is about
-   500 order+cancel pairs per second per bot — a real storm. *)
+(* Build one cancel-storm bot. Each one gets its own name, random seed, and
+   id generator, so the copies run independently. 50 steps every 100ms is
+   about 500 order+cancel pairs per second per bot — a real storm. *)
 let storm_bot ~participant ~rng_seed : Bot_spec.t =
   T
     { bot = (module Cancel_storm_bot)
