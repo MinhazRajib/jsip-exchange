@@ -4,12 +4,22 @@ open Jsip_types
 open Jsip_order_book
 
 module Requests = struct
-  type t =
+  (* What the client asked for. *)
+  type kind =
     | Order of Order.Request.t
     | Cancel of
         { participant : Participant.t
         ; client_order_id : Client_order_id.t
         }
+  [@@deriving sexp, bin_io]
+
+  (* A queued request, tagged with when it entered the server. [submitted_at]
+     is stamped at ingress ({!handle_write}) so the matching loop can measure
+     how long the request waited plus took to process. *)
+  type t =
+    { kind : kind
+    ; submitted_at : Time_ns.t
+    }
   [@@deriving sexp, bin_io]
 end
 
@@ -34,12 +44,13 @@ end
    without the server's memory growing unboundedly. *)
 let request_queue_size_budget = 1024
 
-let handle_write ~request_writer (request : Requests.t) =
+let handle_write ~request_writer (kind : Requests.kind) =
+  let request = { Requests.kind; submitted_at = Time_ns.now () } in
   let%map () = Pipe.write_if_open request_writer request in
   Ok ()
 ;;
 
-let start_matching_loop ~engine ~dispatcher request_reader =
+let start_matching_loop ~engine ~dispatcher ~stats request_reader =
   (*=
   let participant = Session.participant session in
                  let cancel_attempt =
@@ -69,26 +80,84 @@ let start_matching_loop ~engine ~dispatcher request_reader =
     Matching_engine.cancel engine participant client_order_id
   in
   don't_wait_for
-    (Pipe.iter_without_pushback request_reader ~f:(fun request ->
-       let events =
-         match request with
-         | Requests.Order request ->
-           filter_bad_client_order_ids engine request
-         | Cancel request ->
-           handle_cancel_requests
-             engine
-             request.participant
-             request.client_order_id
-       in
-       Dispatcher.dispatch dispatcher events))
+    (Pipe.iter_without_pushback
+       request_reader
+       ~f:(fun (request : Requests.t) ->
+         let events =
+           match request.kind with
+           | Requests.Order order -> filter_bad_client_order_ids engine order
+           | Cancel cancel ->
+             handle_cancel_requests
+               engine
+               cancel.participant
+               cancel.client_order_id
+         in
+         (* The request is now handled; record how long it took (ingress to
+            here) in the submit or cancel bucket. *)
+         let latency = Time_ns.diff (Time_ns.now ()) request.submitted_at in
+         (match request.kind with
+          | Requests.Order _ -> Exchange_stats.record_submit stats latency
+          | Cancel _ -> Exchange_stats.record_cancel stats latency);
+         Dispatcher.dispatch dispatcher events))
+;;
+
+(* Sample one symbol's book: best bid/offer plus total resting size and order
+   count on each side. [None] if the engine does not trade [symbol]. *)
+let book_depth_of_symbol engine symbol : Exchange_stats.Book_depth.t option =
+  match Matching_engine.book engine symbol with
+  | None -> None
+  | Some book ->
+    let side_totals side =
+      let orders = Order_book.orders_on_side book side in
+      let total =
+        List.fold orders ~init:Size.zero ~f:(fun acc order ->
+          Size.( + ) acc (Order.remaining_size order))
+      in
+      total, List.length orders
+    in
+    let total_bid_size, bid_count = side_totals Side.Buy in
+    let total_ask_size, ask_count = side_totals Side.Sell in
+    Some
+      { symbol
+      ; bbo = Order_book.best_bid_offer book
+      ; total_bid_size
+      ; total_ask_size
+      ; bid_count
+      ; ask_count
+      }
+;;
+
+(* Once per second, build a snapshot from the latency buckets, [Gc.stat ()],
+   and current book depth, then push it to every dashboard subscriber. *)
+let start_stats_loop ~engine ~stats ~symbols =
+  Clock_ns.every (Time_ns.Span.of_sec 1.) (fun () ->
+    let submit_latency, cancel_latency =
+      Exchange_stats.take_latency_summaries stats
+    in
+    let gc = Gc.stat () in
+    let memory =
+      { Exchange_stats.Memory.live_words = gc.live_words
+      ; heap_words = gc.heap_words
+      ; top_heap_words = gc.top_heap_words
+      ; minor_collections = gc.minor_collections
+      ; major_collections = gc.major_collections
+      ; promoted_words = Float.iround_nearest_exn gc.promoted_words
+      }
+    in
+    let books = List.filter_map symbols ~f:(book_depth_of_symbol engine) in
+    Exchange_stats.publish
+      stats
+      { memory; submit_latency; cancel_latency; books })
 ;;
 
 let start ~symbols ~port () =
   let engine = Matching_engine.create symbols in
   let dispatcher = Dispatcher.create () in
+  let stats = Exchange_stats.create () in
   let request_reader, request_writer = Pipe.create () in
   Pipe.set_size_budget request_writer request_queue_size_budget;
-  start_matching_loop ~engine ~dispatcher request_reader;
+  start_matching_loop ~engine ~dispatcher ~stats request_reader;
+  start_stats_loop ~engine ~stats ~symbols;
   let implementations =
     Rpc.Implementations.create_exn
       ~implementations:
@@ -170,6 +239,10 @@ let start ~symbols ~port () =
                | Some session ->
                  let reader = Session.reader session in
                  return (Ok reader))
+        ; Rpc.Pipe_rpc.implement Rpc_protocol.stats_feed_rpc (fun state () ->
+            ignore state;
+            let reader = Exchange_stats.subscribe stats in
+            return (Ok reader))
         ]
       ~on_unknown_rpc:`Close_connection
       ~on_exception:Log_on_background_exn

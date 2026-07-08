@@ -1,8 +1,8 @@
 (** Tests for the market maker.
 
     The bot's real behaviour ([seed_book] / [run]) needs a live server, so
-    this only checks that a [Config.t] can be built and inspected. Behavioural
-    coverage is a TODO. *)
+    this only checks that a [Config.t] can be built and inspected.
+    Behavioural coverage is a TODO. *)
 
 open! Core
 open Jsip_market_maker.Market_maker

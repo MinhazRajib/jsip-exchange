@@ -117,3 +117,18 @@ let%expect_test "session-feed RPC" =
     |}];
   return ()
 ;;
+
+let%expect_test "stats-feed RPC" =
+  print_s
+    [%sexp
+      (Rpc.Pipe_rpc.shapes Rpc_protocol.stats_feed_rpc
+       : Async_rpc_kernel.Rpc_shapes.t)];
+  [%expect
+    {|
+    (Streaming_rpc (query 86ba5df747eec837f0b391dd49f33f9e)
+     (initial_response 86ba5df747eec837f0b391dd49f33f9e)
+     (update_response 052e392a0e257b11e099442b2e91de18)
+     (error 52966f4a49a77bfdff668e9cc61511b3))
+    |}];
+  return ()
+;;
