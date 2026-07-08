@@ -232,6 +232,66 @@ let%expect_test "book: returns book for known symbol, None for unknown" =
 ;;
 
 (* ================================================================ *)
+(* Regression: filled resting orders don't leak id-table entries *)
+(* ================================================================ *)
+
+(* A fully-filled resting order should be dropped from the engine's
+   client-order-id table, exactly like a cancelled one. The bug this guards
+   against: [match_loop] removed the order from the book but left its table
+   entry behind, so every filled order leaked one entry for the life of the
+   process. That is the linear memory growth measured under the cancel-storm
+   scenario in doc/dashboard-calibration.md. *)
+
+let has_id_entry t participant client_id =
+  Matching_engine.check_client_order_id
+    (Harness.engine t)
+    participant
+    (Client_order_id.of_int client_id)
+  |> Option.is_some
+;;
+
+let%expect_test "fully-filled resting order is removed from the id table" =
+  let t = Harness.create () in
+  (* Bob's sell rests, so its entry is tracked. *)
+  Harness.submit_quiet_
+    t
+    (Harness.sell
+       ~client_id:(Client_order_id.of_int 0)
+       ~price_cents:15000
+       ~participant:Harness.bob
+       ());
+  [%test_result: bool] (has_id_entry t Harness.bob 0) ~expect:true;
+  (* Alice's buy fully fills it. *)
+  Harness.submit_quiet_
+    t
+    (Harness.buy ~client_id:(Client_order_id.of_int 1) ~price_cents:15000 ());
+  (* The filled order's entry is gone — no leak. *)
+  [%test_result: bool] (has_id_entry t Harness.bob 0) ~expect:false
+;;
+
+let%expect_test "partially-filled resting order keeps its id-table entry" =
+  let t = Harness.create () in
+  (* Bob rests 100; Alice buys only 40, leaving 60 resting on the book. *)
+  Harness.submit_quiet_
+    t
+    (Harness.sell
+       ~client_id:(Client_order_id.of_int 0)
+       ~price_cents:15000
+       ~size:100
+       ~participant:Harness.bob
+       ());
+  Harness.submit_quiet_
+    t
+    (Harness.buy
+       ~client_id:(Client_order_id.of_int 1)
+       ~price_cents:15000
+       ~size:40
+       ());
+  (* Still resting, so still cancellable — its entry must remain. *)
+  [%test_result: bool] (has_id_entry t Harness.bob 0) ~expect:true
+;;
+
+(* ================================================================ *)
 (* Price priority *)
 (* ================================================================ *)
 

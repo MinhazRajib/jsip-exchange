@@ -47,29 +47,32 @@ let start_bot ~where_to_connect ~oracle (Bot_spec.T spec) =
       ~cancel
       ~tick_interval:spec.tick_interval
   in
-  let%bind () =
+  (* Always drain the session feed. Every bot subscribes to it above, and the
+     server pushes each bot's accept/cancel/fill events into that pipe with
+     [write_without_pushback_if_open] — so if we don't read it, the pipe
+     buffer grows without bound (the cancel-storm memory leak measured in
+     doc/dashboard-calibration.md). Market-data consumers additionally
+     interleave the market-data stream into the same drain. *)
+  let%bind event_feed =
     match spec.is_marketdata_consumer with
-    | false -> return ()
+    | false -> return session_feed
     | true ->
-      let%bind md_pipe, metadata =
+      let%map md_pipe, metadata =
         Rpc.Pipe_rpc.dispatch_exn
           Rpc_protocol.market_data_rpc
           connection
           spec.symbols
       in
-      let md_session_feed_pipe = Pipe.interleave [ session_feed; md_pipe ] in
       don't_wait_for
-        (let%bind () =
-           Pipe.iter md_session_feed_pipe ~f:(Bot_runtime.feed_event bot)
-         in
-         match%map Rpc.Pipe_rpc.close_reason metadata with
+        (match%map Rpc.Pipe_rpc.close_reason metadata with
          | Rpc.Pipe_close_reason.Closed_locally
          | Rpc.Pipe_close_reason.Closed_remotely ->
            ()
          | Rpc.Pipe_close_reason.Error err ->
            [%log.error "marketdata pipe closed with error" (err : Error.t)]);
-      return ()
+      Pipe.interleave [ session_feed; md_pipe ]
   in
+  don't_wait_for (Pipe.iter event_feed ~f:(Bot_runtime.feed_event bot));
   print_endline
     [%string "[scenario] starting bot %{spec.participant#Participant}"];
   don't_wait_for (Bot_runtime.start bot);

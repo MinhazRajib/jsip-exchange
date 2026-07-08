@@ -72,23 +72,52 @@ latency is submit/cancel p99 over each 1s window; `n/s` is requests/second.
   not build) would more directly show buffer buildup. Worth adding if Section
   3 targets a slow-consumer problem.
 
-### Hypothesis for Section 3 (to verify, then fix)
+### First hypothesis for Section 3 — WRONG (kept as a lesson)
 
-The linear growth points at the matching engine's `participant_client_order_ids`
-table (`lib/order_book/src/matching_engine.ml:19`), which maps every resting
-order's `(participant, client_order_id)` to its `Order.t`:
+Our first guess was the matching engine's `participant_client_order_ids` table
+(`lib/order_book/src/matching_engine.ml:19`): **cancel** removes an order's
+entry but **fill** did not, so filled orders would leak table entries "under a
+storm with crossing trades."
 
-- **Cancel** removes the entry (`matching_engine.ml:59-63`) — cancelled orders
-  are cleaned up.
-- **Fill** does not: when a resting order is fully filled, `match_loop` removes
-  it from the order book (`matching_engine.ml:101-102`) but leaves its entry in
-  `participant_client_order_ids`. Those stale entries accumulate for the life
-  of the process.
+Running the dashboard against the actual bot disproved this:
 
-Under a storm generating continuous fresh client_order_ids with crossing
-trades, filled orders leak entries at a steady rate — matching the linear
-`live_words` slope. **Fix candidate:** remove the table entry when an order is
-fully filled, the same way cancel does.
+- The cancel-storm bot is built to **never cross**. It runs a flat fundamental
+  (`volatility_cents_per_sec = 0.0`) and prices every order 100¢ away, so orders
+  rest and are cancelled — the exchange log shows **0 fills** over a whole run.
+- So the fill path is never taken here, and since every order is submitted
+  (adds a table entry) then cancelled (removes it), the id table stays
+  **bounded**. Fixing the fill path did **not** move the memory line at all.
+
+We still committed the fill-path fix (`matching_engine.ml`) with a regression
+test: it closes a genuine *latent* leak that would bite a filling storm. But it
+is not the fix for what the dashboard measured. **Lesson: a green unit test does
+not mean you fixed the thing you measured — you have to run the app and watch
+the pane move.**
+
+### Actual root cause — found & fixed (verified)
+
+The leak was in the **scenario runner**, not the engine. In
+`app/scenario_runner/src/runner.ml`, every bot subscribes to its `session_feed`
+pipe, but the old code only *drained* that pipe for market-data consumers
+(`is_marketdata_consumer = true`). The cancel-storm bots are not market-data
+consumers, so each one subscribed to a session feed and **never read it** — while
+the server pushed ~1000 accept/cancel events per second per bot into that pipe
+with `write_without_pushback_if_open` (`lib/gateway/src/session.ml:18`), which
+never blocks. The unread pipe buffer grew without bound; three bots produced the
+~60k words/s slope.
+
+**Fix:** always drain the session feed, and interleave market data on top only
+when the bot is a market-data consumer.
+
+**Verified:** after the fix, `live_words` is flat at ~665k for the whole run
+(idle baseline is ~650k), versus ~5.9M and climbing before. Same throughput
+(1500 req/s each), same latency — memory just stops growing.
+
+The server-side `write_without_pushback_if_open` (flagged in `CLAUDE.md`) is the
+deeper *enabler*: a well-behaved exchange would bound the buffer or drop/kick a
+slow consumer instead of buffering forever. That is the right follow-up if a
+**Slow_consumers** bot is added — the runner fix cures the self-inflicted case,
+but not a genuinely slow *client* the server can't control.
 
 ## Scenarios not yet run
 

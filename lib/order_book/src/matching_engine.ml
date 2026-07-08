@@ -86,7 +86,7 @@ let cancel t participant client_order_id =
 (** Run the matching loop: repeatedly find a compatible resting order and
     fill against it. Returns the list of Fill and Trade_report events
     produced, and the next fill_id to use. *)
-let rec match_loop ~book ~order ~fill_id =
+let rec match_loop ~participant_client_order_ids ~book ~order ~fill_id =
   if Size.( <= ) (Order.remaining_size order) Size.zero
   then [], fill_id
   else (
@@ -98,8 +98,20 @@ let rec match_loop ~book ~order ~fill_id =
       in
       Order.fill order ~by:fill_size;
       Order.fill resting ~by:fill_size;
+      (* When a resting order is fully filled we drop it from the book and,
+         just like [cancel] does, from the client-order-id table — otherwise
+         its entry would leak for the life of the process. NOTE: this closes
+         a latent leak on the *fill* path; it is not the cancel-storm leak
+         (that bot never fills — see doc/dashboard-calibration.md). *)
       if Order.is_fully_filled resting
-      then Order_book.remove book (Order.order_id resting);
+      then (
+        Order_book.remove book (Order.order_id resting);
+        Hashtbl.remove
+          participant_client_order_ids
+          ({ participant = Order.participant resting
+           ; client_order_id = Order.client_order_id resting
+           }
+           : Participant_client_order_ids.t));
       let fill_event =
         Exchange_event.Fill
           { fill_id
@@ -123,7 +135,11 @@ let rec match_loop ~book ~order ~fill_id =
           }
       in
       let remaining_events, next_fill_id =
-        match_loop ~book ~order ~fill_id:(fill_id + 1)
+        match_loop
+          ~participant_client_order_ids
+          ~book
+          ~order
+          ~fill_id:(fill_id + 1)
       in
       fill_event :: trade_event :: remaining_events, next_fill_id)
 ;;
@@ -140,7 +156,11 @@ let submit t (request : Order.Request.t) =
     let bbo_before = Order_book.best_bid_offer book in
     (* Match *)
     let fill_events, next_fill_id =
-      match_loop ~book ~order ~fill_id:t.next_fill_id
+      match_loop
+        ~participant_client_order_ids:t.participant_client_order_ids
+        ~book
+        ~order
+        ~fill_id:t.next_fill_id
     in
     t.next_fill_id <- next_fill_id;
     (* Post-match: rest on book or cancel unfilled remainder. *)
