@@ -1,0 +1,10 @@
+(executable
+ (name smoke)
+ (libraries
+  core
+  async
+  jsip_dashboard_protocol
+  async_rpc_websocket
+  core_unix.command_unix)
+ (preprocess
+  (pps ppx_jane)))

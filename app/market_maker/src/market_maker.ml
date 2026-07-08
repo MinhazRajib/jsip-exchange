@@ -185,7 +185,8 @@ let seed_ladder t =
         ; size = Size.of_int config.size_per_level
         ; time_in_force = Day
         ; client_order_id =
-            Client_order_id.of_int (Client_order_id.Generator.next t.client_order_ids)
+            Client_order_id.of_int
+              (Client_order_id.Generator.next t.client_order_ids)
         }
       in
       let%bind () =

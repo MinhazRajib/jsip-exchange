@@ -83,6 +83,84 @@ module Inert_bot = struct
   let on_event () _ctx _event = return ()
 end
 
+(* A helper that builds a config for the bot, so each test doesn't repeat it.
+   [~cycles_per_tick] is left for the caller to choose. *)
+let cancel_storm_config ~cycles_per_tick : Cancel_storm.Config.t =
+  { symbols = [ aapl ]
+  ; cycles_per_tick
+  ; order_size = 10
+  ; price_offset_cents = 100
+  ; client_order_ids = Client_order_id.Generator.create ()
+  }
+;;
+
+(* This test checks the three things the bot must get right:
+   1. every order gets a brand-new id (no repeats),
+   2. every order we send, we also cancel,
+   3. no order is priced to actually trade (buys below, sells above). We work
+      these out by hand and compare, instead of trusting the bot. *)
+let%expect_test "cancel storm submits-then-cancels with fresh ids each cycle"
+  =
+  (* 3 steps per tick. *)
+  let config = cancel_storm_config ~cycles_per_tick:3 in
+  (* A fake bot: instead of talking to a real exchange, it just records every
+     order it submits and every id it cancels into these two lists. *)
+  let bot, submitted, cancelled =
+    make_recording_bot
+      (module Cancel_storm)
+      config
+      ~initial_price_cents:15000
+      ()
+  in
+  let ctx = Bot_runtime.For_testing.context_of bot in
+  (* Fire the timer twice: 3 steps + 3 steps = 6 orders expected. *)
+  let%bind () = Cancel_storm.on_tick config ctx in
+  let%bind () = Cancel_storm.on_tick config ctx in
+  (* The lists are recorded newest-first, so reverse them back to time order. *)
+  let submits = List.rev !submitted in
+  let cancels = List.rev !cancelled in
+  printf
+    "submits: %d, cancels: %d\n"
+    (List.length submits)
+    (List.length cancels);
+  (* Pull just the ids out of each submitted order. *)
+  let submitted_ids = List.map submits ~f:(fun r -> r.client_order_id) in
+  printf !"submitted ids: %{sexp: Client_order_id.t list}\n" submitted_ids;
+  printf !"cancelled ids: %{sexp: Client_order_id.t list}\n" cancels;
+  (* Check 1: no id appears twice. *)
+  printf
+    "ids all distinct: %b\n"
+    (List.contains_dup submitted_ids ~compare:Client_order_id.compare |> not);
+  (* Check 2: the set of ids we cancelled matches the set we submitted. *)
+  printf
+    "every submit was cancelled: %b\n"
+    (List.equal
+       Client_order_id.equal
+       (List.sort submitted_ids ~compare:Client_order_id.compare)
+       (List.sort cancels ~compare:Client_order_id.compare));
+  (* Check 3: each buy is priced below the true price, each sell above it. *)
+  let non_marketable =
+    List.for_all submits ~f:(fun r ->
+      let fundamental = 15000 in
+      match r.side with
+      | Buy -> Price.to_int_cents r.price < fundamental
+      | Sell -> Price.to_int_cents r.price > fundamental)
+  in
+  printf "all orders non-marketable: %b\n" non_marketable;
+  (* [%expect] holds the output we expect. If the code's output ever changes,
+     the test fails and shows the difference. *)
+  [%expect
+    {|
+    submits: 6, cancels: 6
+    submitted ids: (1 2 3 4 5 6)
+    cancelled ids: (1 2 3 4 5 6)
+    ids all distinct: true
+    every submit was cancelled: true
+    all orders non-marketable: true
+    |}];
+  return ()
+;;
+
 let%expect_test "make_recording_bot wires up a runnable bot" =
   let bot, submitted, _cancelled =
     make_recording_bot (module Inert_bot) () ()

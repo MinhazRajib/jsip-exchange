@@ -68,3 +68,14 @@ val audit_log_rpc : (unit, Exchange_event.t, Error.t) Rpc.Pipe_rpc.t
     returns the Pipe.Reader.t. Client subscribes once after login then drains
     the pipe . Delivers the Order calls and Fill events. *)
 val session_feed_rpc : (unit, Exchange_event.t, Error.t) Rpc.Pipe_rpc.t
+
+(** Subscribe to the exchange's infrastructure metrics: one
+    {!Exchange_stats.Snapshot.t} per second covering process memory,
+    submit/cancel latency percentiles, and per-symbol book depth.
+
+    Like {!audit_log_rpc} this is an operator/monitoring RPC — it feeds the
+    dashboard in [app/dashboard], not ordinary participants. It is a separate
+    RPC on purpose: these are process-health metrics, not exchange events, so
+    they do not belong on the audit log. *)
+val stats_feed_rpc
+  : (unit, Exchange_stats.Snapshot.t, Error.t) Rpc.Pipe_rpc.t
