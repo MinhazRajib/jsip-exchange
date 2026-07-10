@@ -156,17 +156,19 @@ let best_bid_offer t : Bbo.t =
   { bid = best_level t Buy; ask = best_level t Sell }
 ;;
 
-let snapshot_side t (side : Side.t) =
-  let compare (level1 : Level.t) (level2 : Level.t) =
-    let price = level1.price in
-    let than = level2.price in
-    if Price.is_more_aggressive side ~price ~than
-    then -1 (* higher precedence *)
-    else if Price.( = ) price than
-    then 0
-    else 1
-  in
-  orders_on_side t side |> List.map ~f:Level.of_order |> List.sort ~compare
+let snapshot_side t side =
+  (* Orders already come out best-price-first (asks ascending; bids are keyed
+     on a negated price), so same-price orders are adjacent. One linear pass
+     folds each run of them into a single aggregated level. *)
+  orders_on_side t side
+  |> List.fold ~init:[] ~f:(fun (acc : Level.t list) order ->
+    let price = Order.price order in
+    let size = Order.remaining_size order in
+    match acc with
+    | { price = prev; size = total } :: rest when Price.( = ) price prev ->
+      { Level.price; size = Size.( + ) total size } :: rest
+    | _ -> { Level.price; size } :: acc)
+  |> List.rev
 ;;
 
 let snapshot t =

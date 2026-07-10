@@ -76,7 +76,9 @@ let engine_with_n_asks ?(min_price = 10_000) n =
     ignore
       (Matching_engine.submit
          engine
-         { client_order_id = Client_order_id.of_int 0
+         (* Distinct client_order_id per order: the engine rejects
+            duplicates. *)
+         { client_order_id = Client_order_id.of_int i
          ; symbol = aapl
          ; participant = bob
          ; side = Sell
@@ -173,6 +175,8 @@ let bench_submit_ioc_cross ~n =
   let max_price = 20_000 in
   let engine = engine_with_n_asks ~min_price n in
   let next_price = ref (min_price + 1) in
+  (* Fresh id per re-seed; filled orders leave stale keys, so never reuse. *)
+  let next_client_id = ref (n + 1) in
   Bench.Test.create
     ~name:[%string "submit_ioc_cross (n=%{n#Int})"]
     (fun () ->
@@ -193,7 +197,7 @@ let bench_submit_ioc_cross ~n =
        ignore
          (Matching_engine.submit
             engine
-            { client_order_id = Client_order_id.of_int 0
+            { client_order_id = Client_order_id.of_int !next_client_id
             ; symbol = aapl
             ; participant = bob
             ; side = Sell
@@ -202,6 +206,7 @@ let bench_submit_ioc_cross ~n =
             ; time_in_force = Day
             }
           : Exchange_event.t list);
+       incr next_client_id;
        next_price := !next_price + 1;
        if !next_price > max_price then next_price := min_price + 1)
 ;;
@@ -286,25 +291,91 @@ let bench_find_match_alloc ~n =
 ;;
 
 (* ---------------------------------------------------------------- *)
+(* Snapshot benchmark *)
+(* ---------------------------------------------------------------- *)
+
+(** Build a book with [n] resting sells all at the *same* price. This is the
+    case snapshot aggregation actually collapses (the other fixture puts
+    every order at a distinct price, where aggregation does nothing). *)
+let book_with_n_asks_same_price ?(price = 15_000) n =
+  let book = Order_book.create aapl in
+  let gen = Order_id.Generator.create () in
+  for i = 1 to n do
+    let order =
+      Order.create
+        { client_order_id = Client_order_id.of_int i
+        ; symbol = aapl
+        ; participant = bob
+        ; side = Sell
+        ; price = Price.of_int_cents price
+        ; size = Size.of_int 100
+        ; time_in_force = Day
+        }
+        ~order_id:(Order_id.Generator.next gen)
+    in
+    Order_book.add book order
+  done;
+  book
+;;
+
+let bench_snapshot ~n =
+  let book = book_with_n_asks_same_price n in
+  Bench.Test.create ~name:[%string "snapshot (n=%{n#Int})"] (fun () ->
+    ignore (Order_book.snapshot book : Book.t))
+;;
+
+(* ---------------------------------------------------------------- *)
+(* Symbol-lookup benchmark *)
+(* ---------------------------------------------------------------- *)
+
+(** Build an engine trading [n] distinct symbols and return it alongside one
+    present symbol to look up. This exercises the symbol->book lookup, which
+    the single-symbol benchmarks above never touch. *)
+let engine_with_n_symbols n =
+  let symbols =
+    List.init n ~f:(fun i -> Symbol.of_string [%string "SYM%{i#Int}"])
+  in
+  Matching_engine.create symbols, List.last_exn symbols
+;;
+
+let bench_symbol_lookup ~n =
+  let engine, symbol = engine_with_n_symbols n in
+  (* Time only [book] (the pure lookup); submit/cancel would bury it. *)
+  Bench.Test.create ~name:[%string "symbol_lookup (n=%{n#Int})"] (fun () ->
+    ignore (Matching_engine.book engine symbol : Order_book.t option))
+;;
+
+let symbol_sizes = [ 10; 100; 1_000; 10_000 ]
+
+(* ---------------------------------------------------------------- *)
 (* Main *)
 (* ---------------------------------------------------------------- *)
 
+let sizes = [ 10; 50; 100; 500 ]
+
+let existing_tests =
+  List.concat
+    [ List.map sizes ~f:(fun n -> bench_find_match ~n)
+    ; List.map sizes ~f:(fun n -> bench_find_match_no_cross ~n)
+    ; List.map sizes ~f:(fun n -> bench_best_bid_offer ~n)
+    ; [ bench_add_remove ~n:100 ]
+    ; List.map sizes ~f:(fun n -> bench_submit_ioc_cross ~n)
+    ; List.map sizes ~f:(fun n -> bench_submit_ioc_no_match ~n)
+    ; List.map [ 10; 50; 100 ] ~f:(fun n -> bench_submit_sweep ~n)
+    ; [ bench_find_match_alloc ~n:100 ]
+    ]
+;;
+
 let () =
-  let sizes = [ 10; 50; 100; 500 ] in
-  let tests =
-    List.concat
-      [ (* Order book micro-benchmarks at various sizes *)
-        List.map sizes ~f:(fun n -> bench_find_match ~n)
-      ; List.map sizes ~f:(fun n -> bench_find_match_no_cross ~n)
-      ; List.map sizes ~f:(fun n -> bench_best_bid_offer ~n)
-      ; [ bench_add_remove ~n:100 ]
-      ; (* Matching engine end-to-end *)
-        List.map sizes ~f:(fun n -> bench_submit_ioc_cross ~n)
-      ; List.map sizes ~f:(fun n -> bench_submit_ioc_no_match ~n)
-      ; List.map [ 10; 50; 100 ] ~f:(fun n -> bench_submit_sweep ~n)
-      ; (* Allocation awareness *)
-        [ bench_find_match_alloc ~n:100 ]
-      ]
-  in
-  Command_unix.run (Bench.make_command tests)
+  Command_unix.run
+    (Command.group
+       ~summary:"JSIP order-book benchmarks"
+       [ "existing", Bench.make_command existing_tests
+       ; ( "snapshot"
+         , Bench.make_command
+             (List.map sizes ~f:(fun n -> bench_snapshot ~n)) )
+       ; ( "symbol-lookup"
+         , Bench.make_command
+             (List.map symbol_sizes ~f:(fun n -> bench_symbol_lookup ~n)) )
+       ])
 ;;

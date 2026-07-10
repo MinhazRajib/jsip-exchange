@@ -12,8 +12,36 @@ module Participant_client_order_ids = struct
   include functor Hashable.Make_plain
 end
 
+(* Maps each traded symbol to a small int id and stores its book in a flat
+   array indexed by that id, so a lookup is one hash + O(1) array index
+   instead of O(log n) string compares. Ids are fixed at [create]. *)
+module Symbol_registry = struct
+  type t =
+    { ids : int Symbol.Table.t
+    ; books : Order_book.t array
+    }
+  [@@deriving sexp_of]
+
+  let create symbols =
+    let ids = Symbol.Table.create () in
+    let books =
+      List.mapi symbols ~f:(fun id symbol ->
+        Hashtbl.add_exn ids ~key:symbol ~data:id;
+        Order_book.create symbol)
+      |> Array.of_list
+    in
+    { ids; books }
+  ;;
+
+  let book t symbol =
+    match Hashtbl.find t.ids symbol with
+    | None -> None
+    | Some id -> Some t.books.(id)
+  ;;
+end
+
 type t =
-  { books : Order_book.t Symbol.Map.t
+  { registry : Symbol_registry.t
   ; order_id_gen : Order_id.Generator.t
   ; mutable next_fill_id : int
   ; mutable participant_client_order_ids :
@@ -22,11 +50,7 @@ type t =
 [@@deriving sexp_of]
 
 let create symbols =
-  let books =
-    List.map symbols ~f:(fun sym -> sym, Order_book.create sym)
-    |> Symbol.Map.of_alist_exn
-  in
-  { books
+  { registry = Symbol_registry.create symbols
   ; order_id_gen = Order_id.Generator.create ()
   ; next_fill_id = 1
   ; participant_client_order_ids =
@@ -40,7 +64,7 @@ let check_client_order_id t participant client_order_id =
     ({ participant; client_order_id } : Participant_client_order_ids.t)
 ;;
 
-let book t symbol = Map.find t.books symbol
+let book t symbol = Symbol_registry.book t.registry symbol
 
 (* remove an order *)
 let cancel t participant client_order_id =
@@ -129,7 +153,7 @@ let rec match_loop ~book ~order ~fill_id =
 ;;
 
 let submit t (request : Order.Request.t) =
-  match Map.find t.books request.symbol with
+  match book t request.symbol with
   | None ->
     [ Exchange_event.Order_reject { request; reason = "unknown symbol" } ]
   | Some book ->
