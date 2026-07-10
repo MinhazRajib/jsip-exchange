@@ -6,8 +6,9 @@ structures to the network protocol.
 
 ## What is an exchange?
 
-cheeky change
 
+
+ploy 4 fhanges
 An exchange is a marketplace where buyers and sellers meet to trade financial
 instruments (stocks, bonds, etc.). The exchange doesn't buy or sell anything
 itself — it _matches_ buyers with sellers.
