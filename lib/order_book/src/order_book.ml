@@ -161,13 +161,14 @@ let snapshot_side t side =
      on a negated price), so same-price orders are adjacent. One linear pass
      folds each run of them into a single aggregated level. *)
   orders_on_side t side
-  |> List.fold ~init:[] ~f:(fun (acc : Level.t list) order ->
+  |> List.fold ~init:[] ~f:(fun (sorted_orders : Level.t list) order ->
     let price = Order.price order in
     let size = Order.remaining_size order in
-    match acc with
+    match sorted_orders with
     | { price = prev; size = total } :: rest when Price.( = ) price prev ->
       { Level.price; size = Size.( + ) total size } :: rest
-    | _ -> { Level.price; size } :: acc)
+    | _ -> { Level.price; size } :: sorted_orders)
+    (* refrain from using pipes if too complex and makes code less readable *)
   |> List.rev
 ;;
 
