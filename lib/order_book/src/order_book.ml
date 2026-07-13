@@ -45,24 +45,6 @@ let get_key order : Price_id_key.t =
     }
 ;;
 
-let set_reverse_index t (orders : Order.t Price_id_key.Map.t) =
-  let new_reverse_index =
-    Map.fold
-      orders
-      ~init:t.reverse_index
-      ~f:(fun ~key:price_id_key ~data:order acc ->
-        Map.set acc ~key:(Order.order_id order) ~data:price_id_key)
-  in
-  t.reverse_index <- new_reverse_index
-;;
-
-let set_side_map t side orders =
-  set_reverse_index t orders;
-  match (side : Side.t) with
-  | Buy -> t.bids <- orders
-  | Sell -> t.asks <- orders
-;;
-
 let set_side_map' t side new_map new_reverse_index =
   t.reverse_index <- new_reverse_index;
   match (side : Side.t) with
@@ -70,11 +52,19 @@ let set_side_map' t side new_map new_reverse_index =
   | Sell -> t.asks <- new_map
 ;;
 
+(* Record just this one order in the reverse index. The old code called
+   [set_side_map], which re-folded the *entire* book to rebuild an index that
+   was already correct — making every [add] O(n), and so filling a book
+   O(n^2). One order changed, so one entry changes. *)
 let add t order =
   let side = Order.side order in
-  let side_map = side_map t side in
-  let new_side_map = Map.add_exn side_map ~key:(get_key order) ~data:order in
-  set_side_map t side new_side_map
+  let key = get_key order in
+  let new_side_map = Map.add_exn (side_map t side) ~key ~data:order in
+  t.reverse_index
+  <- Map.set t.reverse_index ~key:(Order.order_id order) ~data:key;
+  match side with
+  | Buy -> t.bids <- new_side_map
+  | Sell -> t.asks <- new_side_map
 ;;
 
 let remove' t order_id =
@@ -104,25 +94,28 @@ let find t order_id =
   match find_in Buy with Some _ as result -> result | None -> find_in Sell
 ;;
 
-(* NOTE: This walks the list front-to-back and returns the *first* tradable
-   order, not the best-priced one. Orders are in reverse insertion order
-   (newest first), so this matches against whatever was most recently added,
-   regardless of price. See test_matching_engine.ml for a test that
-   demonstrates why this is wrong. *)
+(* The resting side is keyed so that the smallest key is the best order: best
+   price first, and among equal prices the earliest arrival. So the only
+   order that can ever match is the very first one — if it is not marketable,
+   nothing behind it is, because everything behind it is priced worse.
+
+   The old code built a filtered copy of every resting order and then took
+   the minimum of that, which is O(n) work (and O(n) allocation) to answer a
+   question one [Map.min_elt] already answers. *)
 let find_match t incoming =
   let incoming_side = Order.side incoming in
   let opposite_side = Side.flip incoming_side in
-  let resting_orders = side_map t opposite_side in
-  let marketable_orders =
-    Map.filter resting_orders ~f:(fun outgoing_order ->
-      Price.is_marketable
-        incoming_side
-        ~price:(Order.price incoming)
-        ~resting_price:(Order.price outgoing_order))
-  in
-  match Map.min_elt marketable_orders with
-  | Some (_, best_bid) -> Some best_bid
+  match Map.min_elt (side_map t opposite_side) with
   | None -> None
+  | Some (_, best_resting) ->
+    (match
+       Price.is_marketable
+         incoming_side
+         ~price:(Order.price incoming)
+         ~resting_price:(Order.price best_resting)
+     with
+     | true -> Some best_resting
+     | false -> None)
 ;;
 
 let orders_on_side t side = Map.data (side_map t side)
@@ -136,18 +129,24 @@ let best_price t side =
   | Some (_, order) -> Some (Order.price order)
 ;;
 
+(* Orders at the best price sit at the very front of the map, all together.
+   So we can add up their sizes and stop the moment the price changes —
+   everything after that is at a worse price and cannot be part of the top
+   level. The old code folded the whole book, which is O(n) to answer a
+   question about the handful of orders at the front. *)
 let best_level t side : Level.t option =
   match best_price t side with
   | None -> None
   | Some price ->
     let total_size =
-      Map.fold
+      Map.fold_until
         (side_map t side)
         ~init:Size.zero
         ~f:(fun ~key:_ ~data:order acc ->
-          if Price.equal (Order.price order) price
-          then Size.( + ) acc (Order.remaining_size order)
-          else acc)
+          match Price.equal (Order.price order) price with
+          | true -> Continue (Size.( + ) acc (Order.remaining_size order))
+          | false -> Stop acc)
+        ~finish:Fn.id
     in
     Some { price; size = total_size }
 ;;
