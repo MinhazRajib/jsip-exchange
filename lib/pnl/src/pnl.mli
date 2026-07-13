@@ -33,7 +33,7 @@ open Jsip_types
     {!Jsip_types.Exchange_event.t}. *)
 module Trade_report : sig
   type t =
-    { symbol : Symbol.t
+    { symbol : Symbol_id.t
     ; price : Price.t
     ; size : Size.t
     }
@@ -47,7 +47,7 @@ end
     that symbol's position. Shows the per symbol breakdown plus the total. *)
 module Summary : sig
   type row =
-    { symbol : Symbol.t
+    { symbol : Symbol_id.t
     ; inventory : int
     ; average_entry_price : Price.t option (** [None] when [inventory = 0] *)
     ; realized_cents : int

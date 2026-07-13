@@ -34,6 +34,22 @@ let%expect_test "login RPC" =
   return ()
 ;;
 
+(* The directory is the one RPC that carries symbol *names*. Everything else
+   on the wire now carries ids; this is what lets a client turn one into the
+   other. *)
+let%expect_test "symbol-directory RPC" =
+  print_s
+    [%sexp
+      (Rpc.Rpc.shapes Rpc_protocol.symbol_directory_rpc
+       : Async_rpc_kernel.Rpc_shapes.t)];
+  [%expect
+    {|
+    (Rpc (query 86ba5df747eec837f0b391dd49f33f9e)
+     (response 4c1e50c93b38c2ad0554cbd929bef3ac))
+    |}];
+  return ()
+;;
+
 let%expect_test "submit-order RPC" =
   print_s
     [%sexp
@@ -41,7 +57,7 @@ let%expect_test "submit-order RPC" =
        : Async_rpc_kernel.Rpc_shapes.t)];
   [%expect
     {|
-    (Rpc (query 2051f8c479fc8afcb143e431719fbb7b)
+    (Rpc (query 5d3aac26f7a93abb4673df09d8c2a244)
      (response 27f76252e5181aab209cd62aa6e42268))
     |}];
   return ()
@@ -54,8 +70,8 @@ let%expect_test "book-query RPC" =
        : Async_rpc_kernel.Rpc_shapes.t)];
   [%expect
     {|
-    (Rpc (query d9a8da25d5656b016fb4dbdc2e4197fb)
-     (response 9bf9d93dd466a19cac18ecff7cd287af))
+    (Rpc (query 698cfa4093fe5e51523842d37b92aeac)
+     (response 69122cea75d1c08088ac96792b33f39f))
     |}];
   return ()
 ;;
@@ -80,9 +96,9 @@ let%expect_test "market-data RPC" =
        : Async_rpc_kernel.Rpc_shapes.t)];
   [%expect
     {|
-    (Streaming_rpc (query 296be80010ace497614f92952e5510c4)
+    (Streaming_rpc (query 4cd553520709511864846bda25c448d0)
      (initial_response 86ba5df747eec837f0b391dd49f33f9e)
-     (update_response 5d79a81fc85a04b9297e9abc6b3216f6)
+     (update_response 52ddfdafd8b60af7ed70cae493d4dc1f)
      (error 52966f4a49a77bfdff668e9cc61511b3))
     |}];
   return ()
@@ -97,7 +113,7 @@ let%expect_test "audit-log RPC" =
     {|
     (Streaming_rpc (query 86ba5df747eec837f0b391dd49f33f9e)
      (initial_response 86ba5df747eec837f0b391dd49f33f9e)
-     (update_response 5d79a81fc85a04b9297e9abc6b3216f6)
+     (update_response 52ddfdafd8b60af7ed70cae493d4dc1f)
      (error 52966f4a49a77bfdff668e9cc61511b3))
     |}];
   return ()
@@ -112,7 +128,7 @@ let%expect_test "session-feed RPC" =
     {|
     (Streaming_rpc (query 86ba5df747eec837f0b391dd49f33f9e)
      (initial_response 86ba5df747eec837f0b391dd49f33f9e)
-     (update_response 5d79a81fc85a04b9297e9abc6b3216f6)
+     (update_response 52ddfdafd8b60af7ed70cae493d4dc1f)
      (error 52966f4a49a77bfdff668e9cc61511b3))
     |}];
   return ()
@@ -127,7 +143,7 @@ let%expect_test "stats-feed RPC" =
     {|
     (Streaming_rpc (query 86ba5df747eec837f0b391dd49f33f9e)
      (initial_response 86ba5df747eec837f0b391dd49f33f9e)
-     (update_response 052e392a0e257b11e099442b2e91de18)
+     (update_response 2768b86ab9e82b3ff2e4d5cf87d1d8c9)
      (error 52966f4a49a77bfdff668e9cc61511b3))
     |}];
   return ()

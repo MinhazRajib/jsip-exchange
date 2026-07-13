@@ -11,7 +11,7 @@ module Context = Jsip_bot_runtime.Bot_runtime.Context
    explained in cancel_storm.mli. *)
 module Config = struct
   type t =
-    { symbols : Symbol.t list
+    { symbols : Symbol_id.t list
     ; cycles_per_tick : int
     ; order_size : int
     ; price_offset_cents : int

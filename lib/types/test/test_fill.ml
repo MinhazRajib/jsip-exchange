@@ -4,7 +4,7 @@ open Jsip_types
 let%expect_test "notional_cents: price * size" =
   let fill =
     ({ fill_id = 1
-     ; symbol = Symbol.of_string "AAPL"
+     ; symbol = Symbol_id.of_int 0
      ; price = Price.of_int_cents 15025
      ; size = Size.of_int 100
      ; aggressor_order_id = Order_id.of_string "1"
@@ -24,7 +24,7 @@ let%expect_test "to_participant_view: participant is aggressor" =
   let participant = Participant.of_string "Alice" in
   let fill =
     ({ fill_id = 1
-     ; symbol = Symbol.of_string "AAPL"
+     ; symbol = Symbol_id.of_int 0
      ; price = Price.of_int_cents 15000
      ; size = Size.of_int 250
      ; aggressor_order_id = Order_id.of_string "1"
@@ -38,11 +38,14 @@ let%expect_test "to_participant_view: participant is aggressor" =
      : Fill.t)
   in
   [%test_result: string option]
-    (Fill.to_participant_view fill participant)
-    ~expect:(Some "You bought 250 AAPL at $150.00");
+    (Fill.to_participant_view
+       ~symbol_to_string:Symbol_id.to_string
+       fill
+       participant)
+    ~expect:(Some "You bought 250 0 at $150.00");
   let fill' =
     ({ fill_id = 1
-     ; symbol = Symbol.of_string "AAPL"
+     ; symbol = Symbol_id.of_int 0
      ; price = Price.of_int_cents 15000
      ; size = Size.of_int 250
      ; aggressor_order_id = Order_id.of_string "1"
@@ -56,15 +59,18 @@ let%expect_test "to_participant_view: participant is aggressor" =
      : Fill.t)
   in
   [%test_result: string option]
-    (Fill.to_participant_view fill' participant)
-    ~expect:(Some "You sold 250 AAPL at $150.00")
+    (Fill.to_participant_view
+       ~symbol_to_string:Symbol_id.to_string
+       fill'
+       participant)
+    ~expect:(Some "You sold 250 0 at $150.00")
 ;;
 
 let%expect_test "to_participant_view: participant is resting" =
   let participant = Participant.of_string "Alice" in
   let fill =
     ({ fill_id = 1
-     ; symbol = Symbol.of_string "AAPL"
+     ; symbol = Symbol_id.of_int 0
      ; price = Price.of_int_cents 15000
      ; size = Size.of_int 250
      ; aggressor_order_id = Order_id.of_string "1"
@@ -78,11 +84,14 @@ let%expect_test "to_participant_view: participant is resting" =
      : Fill.t)
   in
   [%test_result: string option]
-    (Fill.to_participant_view fill participant)
-    ~expect:(Some "You sold 250 AAPL at $150.00");
+    (Fill.to_participant_view
+       ~symbol_to_string:Symbol_id.to_string
+       fill
+       participant)
+    ~expect:(Some "You sold 250 0 at $150.00");
   let fill' =
     ({ fill_id = 1
-     ; symbol = Symbol.of_string "AAPL"
+     ; symbol = Symbol_id.of_int 0
      ; price = Price.of_int_cents 15000
      ; size = Size.of_int 250
      ; aggressor_order_id = Order_id.of_string "1"
@@ -96,15 +105,18 @@ let%expect_test "to_participant_view: participant is resting" =
      : Fill.t)
   in
   [%test_result: string option]
-    (Fill.to_participant_view fill' participant)
-    ~expect:(Some "You bought 250 AAPL at $150.00")
+    (Fill.to_participant_view
+       ~symbol_to_string:Symbol_id.to_string
+       fill'
+       participant)
+    ~expect:(Some "You bought 250 0 at $150.00")
 ;;
 
 let%expect_test "to_participant_view: participant not in Fill" =
   let participant = Participant.of_string "John" in
   let fill =
     ({ fill_id = 1
-     ; symbol = Symbol.of_string "AAPL"
+     ; symbol = Symbol_id.of_int 0
      ; price = Price.of_int_cents 15000
      ; size = Size.of_int 250
      ; aggressor_order_id = Order_id.of_string "1"
@@ -118,6 +130,9 @@ let%expect_test "to_participant_view: participant not in Fill" =
      : Fill.t)
   in
   [%test_result: string option]
-    (Fill.to_participant_view fill participant)
+    (Fill.to_participant_view
+       ~symbol_to_string:Symbol_id.to_string
+       fill
+       participant)
     ~expect:None
 ;;

@@ -1,6 +1,7 @@
 open! Core
 open Jsip_types
 open Jsip_gateway
+open Jsip_test_harness
 
 (** Event formating with example clients and interactions
 
@@ -14,7 +15,7 @@ let%expect_test "format_event: all event types" =
         { order_id = Order_id.of_string "1"
         ; request =
             { client_order_id = Client_order_id.of_int 0
-            ; symbol = Symbol.of_string "AAPL"
+            ; symbol = Symbol_id.of_int 0
             ; participant = Participant.of_string "Alice"
             ; side = Buy
             ; price = Price.of_int_cents 15000
@@ -24,7 +25,7 @@ let%expect_test "format_event: all event types" =
         }
     ; Fill
         { fill_id = 1
-        ; symbol = Symbol.of_string "AAPL"
+        ; symbol = Symbol_id.of_int 0
         ; price = Price.of_int_cents 15000
         ; size = Size.of_int 100
         ; aggressor_order_id = Order_id.of_string "2"
@@ -39,14 +40,14 @@ let%expect_test "format_event: all event types" =
         { client_order_id = Client_order_id.of_int 0
         ; order_id = Order_id.of_string "3"
         ; participant = Participant.of_string "Charlie"
-        ; symbol = Symbol.of_string "TSLA"
+        ; symbol = Symbol_id.of_int 1
         ; remaining_size = Size.of_int 50
         ; reason = Ioc_remainder
         }
     ; Order_reject
         { request =
             { client_order_id = Client_order_id.of_int 0
-            ; symbol = Symbol.of_string "GOOG"
+            ; symbol = Symbol_id.of_int 2
             ; participant = Participant.of_string "Alice"
             ; side = Sell
             ; price = Price.of_int_cents 28000
@@ -56,7 +57,7 @@ let%expect_test "format_event: all event types" =
         ; reason = "unknown symbol"
         }
     ; Best_bid_offer_update
-        { symbol = Symbol.of_string "AAPL"
+        { symbol = Symbol_id.of_int 0
         ; bbo =
             { bid =
                 Some
@@ -70,17 +71,17 @@ let%expect_test "format_event: all event types" =
                   }
             }
         }
-    ; Best_bid_offer_update
-        { symbol = Symbol.of_string "AAPL"; bbo = Bbo.empty }
+    ; Best_bid_offer_update { symbol = Symbol_id.of_int 0; bbo = Bbo.empty }
     ; Trade_report
-        { symbol = Symbol.of_string "AAPL"
+        { symbol = Symbol_id.of_int 0
         ; price = Price.of_int_cents 15000
         ; size = Size.of_int 100
         }
     ]
   in
   List.iter events ~f:(fun e ->
-    print_endline (Event_formatter.format_event e));
+    print_endline
+      (Event_formatter.format_event ~directory:Harness.default_directory e));
   [%expect
     {|
     ACCEPTED client-id=0 id=1 AAPL BUY 100@$150.00 DAY

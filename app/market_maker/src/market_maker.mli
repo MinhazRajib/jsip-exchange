@@ -20,7 +20,7 @@ module Config : sig
     (** The participant identity the bot quotes under. The connection passed
         to {!seed_book} / {!run} must already be logged in as this
         participant. *)
-    ; symbol : Symbol.t
+    ; symbol : Symbol_id.t
     ; fair_value_cents : int
     (** The market maker's estimate of the true price, in cents. *)
     ; half_spread_cents : int

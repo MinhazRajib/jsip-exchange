@@ -9,6 +9,7 @@
 
 open! Core
 open Jsip_types
+open Jsip_gateway
 
 (** Coarse-grained grouping of [Exchange_event.t] variants, suited for "show
     only orders" / "show only trades" / "show only market data" filters.
@@ -65,7 +66,13 @@ module Filter : sig
   val combine : t -> t -> t
 
   (** Whether the filter would keep [event]. *)
-  val matches : t -> Exchange_event.t -> bool
+  (** The substring predicate matches against the rendered line, so this
+      needs the directory to turn symbol ids into the names a user types. *)
+  val matches
+    :  directory:Symbol_directory.t
+    -> t
+    -> Exchange_event.t
+    -> bool
 end
 
 type t
@@ -85,7 +92,7 @@ val event_count : t -> int
     insertion order of first appearance: a symbol's slot is added the first
     time it produces a BBO and never reordered, even when later BBOs update
     its value. *)
-val current_bbos : t -> (Symbol.t * Bbo.t) list
+val current_bbos : t -> (Symbol_id.t * Bbo.t) list
 
 (** Replace the active filter. *)
 val set_filter : t -> Filter.t -> t
@@ -94,11 +101,17 @@ val set_filter : t -> Filter.t -> t
 val filter : t -> Filter.t
 
 (** Visible events in insertion order (oldest first). *)
-val visible_events : t -> Exchange_event.t list
+val visible_events
+  :  directory:Symbol_directory.t
+  -> t
+  -> Exchange_event.t list
 
 (** Visible events rendered as text via [Format.format_event]. *)
-val visible_lines : t -> string list
+val visible_lines : directory:Symbol_directory.t -> t -> string list
 
 (** Visible events rendered as [(Color.t, line)] pairs, ready for a styled
     UI. *)
-val visible_styled_lines : t -> (Color.t * string) list
+val visible_styled_lines
+  :  directory:Symbol_directory.t
+  -> t
+  -> (Color.t * string) list

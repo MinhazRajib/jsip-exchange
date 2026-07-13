@@ -3,8 +3,8 @@ open Jsip_types
 
 type t =
   | Submit of Order.Request.t
-  | Book of Symbol.t
-  | Subscribe of Symbol.t
+  | Book of Symbol_id.t
+  | Subscribe of Symbol_id.t
   | Cancel of Client_order_id.t
 
 type verb =
@@ -15,11 +15,29 @@ type verb =
   | Cancel
 [@@deriving string ~case_insensitive ~capitalize:"SCREAMING_SNAKE_CASE"]
 
-(* Default participant when no "as <name>" is specified in the command, adding the optional argument 
+(* Default participant when no "as <name>" is specified in the command, adding the optional argument
 `default_participant` overrides this with the caller-supplied default. *)
 let system_default_participant = "anonymous"
 
-let parse ?default_participant:participant line =
+(* The parse boundary: a human types a name, the wire carries an id. This is
+   where the directory turns one into the other, so an unknown symbol is
+   caught here rather than becoming an order the exchange has to reject. *)
+let parse_symbol_id ~directory symbol_str =
+  let%bind.Or_error symbol =
+    try Ok (Symbol.of_string symbol_str) with
+    | exn ->
+      let exn_str = Exn.to_string exn in
+      Or_error.error_string
+        [%string "invalid symbol: %{symbol_str}\nexception: %{exn_str}"]
+  in
+  match Symbol_directory.find_id directory symbol with
+  | Some id -> Ok id
+  | None ->
+    Or_error.error_string
+      [%string "unknown symbol: %{symbol_str} (not traded on this exchange)"]
+;;
+
+let parse ?default_participant:participant ~directory line =
   let line_stripped = String.strip line |> String.filter ~f:(fun c -> not (Char.equal c '\n')) in
   if String.is_empty line_stripped
   then Or_error.error_string "empty command"
@@ -69,14 +87,7 @@ let parse ?default_participant:participant line =
                     Or_error.error_string
                       [%string "invalid price: %{price_str}\nexception: %{exn_str}"]
                 in
-                let%bind symbol =
-                  try Ok (Symbol.of_string symbol_str) with
-                  | exn ->
-                    let exn_str = Exn.to_string exn in
-                    Or_error.error_string
-                      [%string
-                        "invalid symbol: %{symbol_str}\nexception: %{exn_str}"]
-                in
+                let%bind symbol = parse_symbol_id ~directory symbol_str in
                 let%bind time_in_force, rest =
                   match rest with
                   | tif_str :: rest' ->(
@@ -119,15 +130,8 @@ let parse ?default_participant:participant line =
         | Book | Subscribe ->(
           match remaining_arguments with 
           | symbol_str::_ ->
-              let%bind symbol =
-                try Ok (Symbol.of_string symbol_str) with
-                | exn ->
-                let exn_str = Exn.to_string exn in
-                Or_error.error_string
-                  [%string
-                  "invalid symbol: %{symbol_str}\nexception: %{exn_str}"]
-              in
-              (match command with 
+              let%bind symbol = parse_symbol_id ~directory symbol_str in
+              (match command with
                 | Book -> Ok (Book symbol : t)
                 | Subscribe -> Ok (Subscribe symbol)
                 | _ -> Or_error.error_string "UNEXPECTED ERROR: should be caught by earlier errors")

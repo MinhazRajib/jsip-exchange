@@ -10,7 +10,7 @@
 type t =
   { fill_id : int
   (** Unique fill identifier, assigned sequentially by the matching engine. *)
-  ; symbol : Symbol.t
+  ; symbol : Symbol_id.t
   ; price : Price.t (** The price at which the trade occurred. *)
   ; size : Size.t (** The number of shares/units traded. *)
   ; aggressor_order_id : Order_id.t
@@ -23,7 +23,9 @@ type t =
   }
 [@@deriving sexp, bin_io]
 
-val to_string : t -> string
+(** Render the fill. The symbol is an id; the caller supplies the resolver
+    that turns it into text. See {!Book.to_string} for why. *)
+val to_string : symbol_to_string:(Symbol_id.t -> string) -> t -> string
 
 (** {2 Convenience accessors} *)
 
@@ -34,4 +36,8 @@ val notional_cents : t -> int
     not involve a given participant it returns `None`
 
     Does not expose the inputted client_order_id. *)
-val to_participant_view : t -> Participant.t -> string option
+val to_participant_view
+  :  symbol_to_string:(Symbol_id.t -> string)
+  -> t
+  -> Participant.t
+  -> string option

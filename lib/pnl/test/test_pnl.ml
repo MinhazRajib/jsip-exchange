@@ -9,7 +9,7 @@ open Jsip_test_harness
    on the opposite side. *)
 let fill ~aggressor ~aggressor_side ~resting ~price_cents ~size : Fill.t =
   { fill_id = 1
-  ; symbol = Harness.aapl
+  ; symbol = Harness.aapl_id
   ; price = Price.of_int_cents price_cents
   ; size = Size.of_int size
   ; aggressor_order_id = Order_id.For_testing.of_int 1
@@ -45,7 +45,7 @@ let%expect_test "opening a position and marking to market" =
   let t =
     Pnl.apply_trade_report
       t
-      { symbol = Harness.aapl
+      { symbol = Harness.aapl_id
       ; price = Price.of_int_cents 15200
       ; size = Size.of_int 100
       }
@@ -55,10 +55,10 @@ let%expect_test "opening a position and marking to market" =
   [%expect
     {|
     Alice:
-      AAPL: inv=100 avg=$150.00 realized=$0.00 unrealized=$200.00 total=$200.00
+      0: inv=100 avg=$150.00 realized=$0.00 unrealized=$200.00 total=$200.00
       TOTAL: realized=$0.00 unrealized=$200.00 total=$200.00
     Bob:
-      AAPL: inv=-100 avg=$150.00 realized=$0.00 unrealized=-$200.00 total=-$200.00
+      0: inv=-100 avg=$150.00 realized=$0.00 unrealized=-$200.00 total=-$200.00
       TOTAL: realized=$0.00 unrealized=-$200.00 total=-$200.00
     |}]
 ;;
@@ -90,7 +90,7 @@ let%expect_test "adding to a position blends the average entry" =
   [%expect
     {|
     Alice:
-      AAPL: inv=200 avg=$155.00 realized=$0.00 unrealized=$0.00 total=$0.00
+      0: inv=200 avg=$155.00 realized=$0.00 unrealized=$0.00 total=$0.00
       TOTAL: realized=$0.00 unrealized=$0.00 total=$0.00
     |}]
 ;;
@@ -124,7 +124,7 @@ let%expect_test "closing a position realizes cash" =
   [%expect
     {|
     Alice:
-      AAPL: inv=0 avg=-- realized=$100.00 unrealized=$0.00 total=$100.00
+      0: inv=0 avg=-- realized=$100.00 unrealized=$0.00 total=$100.00
       TOTAL: realized=$100.00 unrealized=$0.00 total=$100.00
     |}]
 ;;
@@ -150,7 +150,7 @@ let%expect_test "partial close splits total into realized and unrealized" =
   let t =
     Pnl.apply_trade_report
       t
-      { symbol = Harness.aapl
+      { symbol = Harness.aapl_id
       ; price = Price.of_int_cents 16000
       ; size = Size.of_int 10
       }
@@ -169,7 +169,7 @@ let%expect_test "partial close splits total into realized and unrealized" =
   [%expect
     {|
     Alice:
-      AAPL: inv=60 avg=$150.00 realized=$400.00 unrealized=$600.00 total=$1000.00
+      0: inv=60 avg=$150.00 realized=$400.00 unrealized=$600.00 total=$1000.00
       TOTAL: realized=$400.00 unrealized=$600.00 total=$1000.00
     |}]
 ;;
@@ -203,7 +203,7 @@ let%expect_test "flipping through zero closes then reopens" =
   let t =
     Pnl.apply_trade_report
       t
-      { symbol = Harness.aapl
+      { symbol = Harness.aapl_id
       ; price = Price.of_int_cents 15200
       ; size = Size.of_int 150
       }
@@ -212,7 +212,7 @@ let%expect_test "flipping through zero closes then reopens" =
   [%expect
     {|
     Alice:
-      AAPL: inv=-50 avg=$151.00 realized=$100.00 unrealized=-$50.00 total=$50.00
+      0: inv=-50 avg=$151.00 realized=$100.00 unrealized=-$50.00 total=$50.00
       TOTAL: realized=$100.00 unrealized=-$50.00 total=$50.00
     |}]
 ;;

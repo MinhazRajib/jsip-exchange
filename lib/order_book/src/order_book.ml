@@ -12,7 +12,7 @@ module Price_id_key = struct
 end
 
 type t =
-  { symbol : Symbol.t
+  { symbol : Symbol_id.t
   ; mutable bids : Order.t Price_id_key.Map.t
   ; mutable asks : Order.t Price_id_key.Map.t
   ; mutable reverse_index : Price_id_key.t Order_id.Map.t

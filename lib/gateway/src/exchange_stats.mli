@@ -33,7 +33,7 @@ end
     BBO and how much interest is stacked up behind it. *)
 module Book_depth : sig
   type t =
-    { symbol : Symbol.t
+    { symbol : Symbol_id.t
     ; bbo : Bbo.t
     ; total_bid_size : Size.t
     ; total_ask_size : Size.t

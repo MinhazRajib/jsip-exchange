@@ -3,7 +3,7 @@ open Jsip_types
 
 module Trade_report = struct
   type t =
-    { symbol : Symbol.t
+    { symbol : Symbol_id.t
     ; price : Price.t
     ; size : Size.t
     }
@@ -83,13 +83,15 @@ module Position = struct
 end
 
 type t =
-  { positions : Position.t Symbol.Map.t Participant.Map.t
-  ; reference_prices : Price.t Symbol.Map.t
+  { positions : Position.t Symbol_id.Map.t Participant.Map.t
+  ; reference_prices : Price.t Symbol_id.Map.t
   }
 [@@deriving sexp_of]
 
 let empty =
-  { positions = Participant.Map.empty; reference_prices = Symbol.Map.empty }
+  { positions = Participant.Map.empty
+  ; reference_prices = Symbol_id.Map.empty
+  }
 ;;
 
 let find_position t ~participant ~symbol =
@@ -102,7 +104,7 @@ let find_position t ~participant ~symbol =
 let set_position t ~participant ~symbol position =
   let by_symbol =
     Map.find t.positions participant
-    |> Option.value ~default:Symbol.Map.empty
+    |> Option.value ~default:Symbol_id.Map.empty
   in
   let by_symbol = Map.set by_symbol ~key:symbol ~data:position in
   { t with positions = Map.set t.positions ~key:participant ~data:by_symbol }
@@ -145,7 +147,7 @@ let apply_trade_report t (trade_report : Trade_report.t) =
 
 module Summary = struct
   type row =
-    { symbol : Symbol.t
+    { symbol : Symbol_id.t
     ; inventory : int
     ; average_entry_price : Price.t option
     ; realized_cents : int
@@ -173,7 +175,7 @@ module Summary = struct
         Price.to_string_dollar (Price.of_int_cents cents)
       in
       [%string
-        "  %{row.symbol#Symbol}: inv=%{row.inventory#Int} avg=%{avg} \
+        "  %{row.symbol#Symbol_id}: inv=%{row.inventory#Int} avg=%{avg} \
          realized=%{dollars row.realized_cents} unrealized=%{dollars \
          row.unrealized_cents} total=%{dollars row.total_cents}"]
     in
@@ -192,7 +194,7 @@ end
 let summary t participant : Summary.t =
   let by_symbol =
     Map.find t.positions participant
-    |> Option.value ~default:Symbol.Map.empty
+    |> Option.value ~default:Symbol_id.Map.empty
   in
   let per_symbol =
     Map.to_alist by_symbol

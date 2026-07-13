@@ -13,6 +13,7 @@
 
 open! Core
 open Jsip_types
+open Jsip_gateway
 
 (** A single labelled toggle in the filter row. The bonsai_term layer renders
     each chip as bracketed text colored by [enabled] and prefixed with its
@@ -38,7 +39,7 @@ module Display : sig
   type t =
     { title : string
     ; counter : string
-    ; bbo_panel : (Symbol.t * Bbo.t) list
+    ; bbo_panel : (string * Bbo.t) list
     (** Snapshot of the latest BBO per symbol, in first-appearance order.
         Always visible in the chrome — independent of the event-list filters
         — so the user can keep an eye on the live market while drilling into
@@ -75,4 +76,6 @@ val should_exit : t -> bool
 val is_editing_substring : t -> bool
 
 (** Render the current state as [Display.t]. *)
-val display : t -> Display.t
+(** Build everything the view needs. Symbol ids are resolved to names here,
+    at the render boundary, so the view layer deals only in text. *)
+val display : directory:Symbol_directory.t -> t -> Display.t

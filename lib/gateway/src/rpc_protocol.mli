@@ -34,9 +34,20 @@ val login_rpc : (String.t, Participant.t Or_error.t) Rpc.Rpc.t
     (those arrive as [Order_reject] events on the session feed). *)
 val submit_order_rpc : (Order.Request.t, unit Or_error.t) Rpc.Rpc.t
 
+(** The exchange's (name, id) pairs for every symbol it trades.
+
+    Symbols travel on the wire as ints, so a client needs this to turn a name
+    a human typed into an id, and an id off the wire back into a name. Fetch
+    it once at connect and mirror it locally; the exchange's symbol set is
+    fixed at startup, so it never goes stale within a run.
+
+    The exchange serves this but never consults it — it does not render
+    symbols, so it has no use for id->name itself. *)
+val symbol_directory_rpc : (unit, (Symbol.t * Symbol_id.t) list) Rpc.Rpc.t
+
 (** Query the order book for a given symbol. Returns a structured snapshot of
     all resting orders on both sides, if a book for that symbol exists. *)
-val book_query_rpc : (Symbol.t, Book.t option) Rpc.Rpc.t
+val book_query_rpc : (Symbol_id.t, Book.t option) Rpc.Rpc.t
 
 (** Cancel a given client_order. Returns an error if order does not exist,
     unit if no errors. *)
@@ -48,7 +59,7 @@ val cancel_order_rpc : (Client_order_id.t, unit Or_error.t) Rpc.Rpc.t
     avoids the overhead of opening a separate pipe per symbol when a client
     cares about several. *)
 val market_data_rpc
-  : (Symbol.t list, Exchange_event.t, Error.t) Rpc.Pipe_rpc.t
+  : (Symbol_id.t list, Exchange_event.t, Error.t) Rpc.Pipe_rpc.t
 
 (** Subscribe to the full audit log: every [Exchange_event.t] the matching
     engine produces, across every symbol and participant.

@@ -82,8 +82,11 @@ module Filter = struct
     | Substring s -> String.Caseless.is_substring line ~substring:s
   ;;
 
-  let matches t event =
-    let line = Event_formatter.format_event event in
+  (* The substring predicate searches the *rendered* line, so it needs the
+     directory: typing "/AAPL" must match an event whose symbol is the id the
+     exchange uses for AAPL. *)
+  let matches ~directory t event =
+    let line = Event_formatter.format_event ~directory event in
     List.for_all t ~f:(predicate_matches event line)
   ;;
 end
@@ -93,7 +96,7 @@ type t =
   ; filter : Filter.t
   ; (* Ordered by first appearance — newest symbol last. Reorganising on
        every BBO would be visually noisy. *)
-    bbos_rev : (Symbol.t * Bbo.t) list
+    bbos_rev : (Symbol_id.t * Bbo.t) list
   }
 
 let create () = { events_rev = []; filter = Filter.all; bbos_rev = [] }
@@ -101,7 +104,7 @@ let create () = { events_rev = []; filter = Filter.all; bbos_rev = [] }
 let update_bbos bbos_rev symbol bbo =
   let found, updated =
     List.fold_map bbos_rev ~init:false ~f:(fun found (sym, current) ->
-      if Symbol.equal sym symbol
+      if Symbol_id.equal sym symbol
       then true, (sym, bbo)
       else found, (sym, current))
   in
@@ -123,15 +126,17 @@ let current_bbos t = List.rev t.bbos_rev
 let set_filter t filter = { t with filter }
 let filter t = t.filter
 
-let visible_events t =
-  List.rev_filter t.events_rev ~f:(Filter.matches t.filter)
+let visible_events ~directory t =
+  List.rev_filter t.events_rev ~f:(Filter.matches ~directory t.filter)
 ;;
 
-let visible_lines t =
-  List.map (visible_events t) ~f:Event_formatter.format_event
+let visible_lines ~directory t =
+  List.map
+    (visible_events ~directory t)
+    ~f:(Event_formatter.format_event ~directory)
 ;;
 
-let visible_styled_lines t =
-  List.map (visible_events t) ~f:(fun event ->
-    Color.of_event event, Event_formatter.format_event event)
+let visible_styled_lines ~directory t =
+  List.map (visible_events ~directory t) ~f:(fun event ->
+    Color.of_event event, Event_formatter.format_event ~directory event)
 ;;

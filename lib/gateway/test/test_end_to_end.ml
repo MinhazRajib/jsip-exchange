@@ -81,8 +81,10 @@ let%expect_test "e2e: three clients, sequential orders, shared book" =
       [for Charlie] FILL fill_id=2 AAPL $150.10 x30 aggressor=3 (client-id=0) (Alice) BUY resting=2 (client-id=0) (Charlie)
       |}];
     (* Verify book state *)
-    let%bind book = rpc_book alice Harness.aapl in
-    print_endline (Option.value_exn book |> Book.to_string);
+    let%bind book = rpc_book alice Harness.aapl_id in
+    print_endline
+      (Option.value_exn book
+       |> Event_formatter.format_book ~directory:(directory alice));
     [%expect
       {|
       === AAPL ===
@@ -107,7 +109,7 @@ let%expect_test "e2e: market data subscriber receives trade and BBO updates" =
       Rpc.Pipe_rpc.dispatch
         Rpc_protocol.market_data_rpc
         (connection sub)
-        [ Harness.aapl ]
+        [ Harness.aapl_id ]
     in
     let reader =
       match result with
@@ -116,7 +118,11 @@ let%expect_test "e2e: market data subscriber receives trade and BBO updates" =
     in
     don't_wait_for
       (Pipe.iter_without_pushback reader ~f:(fun event ->
-         let e = Event_formatter.format_event event in
+         let e =
+           Event_formatter.format_event
+             ~directory:Harness.default_directory
+             event
+         in
          print_endline [%string "[MD Subscriber] %{e}"]));
     (* Post a sell *)
     let%bind () =
@@ -150,7 +156,7 @@ let%expect_test "e2e: subscriber only sees events for subscribed symbol" =
       Rpc.Pipe_rpc.dispatch
         Rpc_protocol.market_data_rpc
         (connection sub)
-        [ Harness.aapl ]
+        [ Harness.aapl_id ]
     in
     let reader =
       match result with
@@ -159,7 +165,11 @@ let%expect_test "e2e: subscriber only sees events for subscribed symbol" =
     in
     don't_wait_for
       (Pipe.iter_without_pushback reader ~f:(fun event ->
-         let e = Event_formatter.format_event event in
+         let e =
+           Event_formatter.format_event
+             ~directory:Harness.default_directory
+             event
+         in
          print_endline [%string "[MD Subscriber] %{e}"]));
     (* Post on TSLA — subscriber should NOT see this *)
     let%bind () =
@@ -168,7 +178,7 @@ let%expect_test "e2e: subscriber only sees events for subscribed symbol" =
         (Harness.sell
            ~price_cents:20000
            ~client_id:(Client_order_id.of_int 0)
-           ~symbol:Harness.tsla
+           ~symbol:Harness.tsla_id
            ~participant:Harness.bob
            ())
     in
@@ -238,7 +248,7 @@ let%expect_test "e2e: many clients submit orders concurrently" =
        instead: 10 sells went in, the 5 buys at $150.10 each hit the
        lowest-priced sell, so 5 sells should remain. *)
     let (_ : string) = [%expect.output] in
-    let%bind book = rpc_book seed Harness.aapl in
+    let%bind book = rpc_book seed Harness.aapl_id in
     let book = Option.value_exn book in
     let remaining_orders = List.length book.bids + List.length book.asks in
     [%test_result: int] remaining_orders ~expect:5;
@@ -266,7 +276,11 @@ let%expect_test "e2e: audit log subscriber sees full unfiltered stream \
     in
     don't_wait_for
       (Pipe.iter_without_pushback reader ~f:(fun event ->
-         let e = Event_formatter.format_event event in
+         let e =
+           Event_formatter.format_event
+             ~directory:Harness.default_directory
+             event
+         in
          print_endline [%string "[AUDIT] %{e}"]));
     (* Post a sell on AAPL — audit subscriber should see ACCEPTED and BBO. *)
     let%bind () =
@@ -291,7 +305,7 @@ let%expect_test "e2e: audit log subscriber sees full unfiltered stream \
         bob
         (Harness.sell
            ~price_cents:20000
-           ~symbol:Harness.tsla
+           ~symbol:Harness.tsla_id
            ~client_id:(Client_order_id.of_int 1)
            ~participant:Harness.bob
            ())
@@ -320,7 +334,7 @@ let%expect_test "e2e: audit log subscriber sees full unfiltered stream \
 let%expect_test "dispatcher: closing a subscriber's reader removes the \
                  writer"
   =
-  let dispatcher = Dispatcher.create () in
+  let dispatcher = Dispatcher.create ~num_symbols:1 in
   print_s
     [%message
       "initial"
@@ -388,7 +402,7 @@ let%expect_test "e2e: stats feed reports live book depth for a resting order"
      | `Ok snapshot ->
        let aapl =
          List.find_exn snapshot.Exchange_stats.Snapshot.books ~f:(fun book ->
-           Symbol.equal book.symbol Harness.aapl)
+           Symbol_id.equal book.symbol Harness.aapl_id)
        in
        print_s
          [%message
@@ -516,8 +530,10 @@ let%expect_test "e2e: BBO update after cancel" =
     [%expect
       {| [for Charlie] ACCEPTED client-id=0 id=2 AAPL SELL 50@$150.10 DAY |}];
     (* Verify book state prior to cancel *)
-    let%bind book = rpc_book bob Harness.aapl in
-    print_endline (Option.value_exn book |> Book.to_string);
+    let%bind book = rpc_book bob Harness.aapl_id in
+    print_endline
+      (Option.value_exn book
+       |> Event_formatter.format_book ~directory:(directory bob));
     [%expect
       {|
       === AAPL ===
@@ -532,8 +548,10 @@ let%expect_test "e2e: BBO update after cancel" =
     [%expect
       {| [for Bob] CANCELLED client_id=0 id=1 AAPL remaining=50 reason=PARTICIPANT_REQUESTED |}];
     (* Verify book state after cancel *)
-    let%bind book = rpc_book bob Harness.aapl in
-    print_endline (Option.value_exn book |> Book.to_string);
+    let%bind book = rpc_book bob Harness.aapl_id in
+    print_endline
+      (Option.value_exn book
+       |> Event_formatter.format_book ~directory:(directory bob));
     [%expect
       {|
       === AAPL ===

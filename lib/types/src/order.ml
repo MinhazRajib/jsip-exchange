@@ -3,7 +3,7 @@ open! Core
 module Request = struct
   type t =
     { client_order_id : Client_order_id.t
-    ; symbol : Symbol.t
+    ; symbol : Symbol_id.t
     ; participant : Participant.t
     ; side : Side.t
     ; price : Price.t
@@ -13,6 +13,7 @@ module Request = struct
   [@@deriving sexp, bin_io]
 
   let to_string
+    ~symbol_to_string
     { client_order_id
     ; symbol
     ; participant
@@ -24,8 +25,9 @@ module Request = struct
     =
     let price = Price.to_string_dollar price in
     let size = Size.to_int size in
+    let symbol = symbol_to_string symbol in
     [%string
-      "%{client_order_id#Client_order_id} %{side#Side} %{symbol#Symbol} \
+      "%{client_order_id#Client_order_id} %{side#Side} %{symbol} \
        %{size#Int}@%{price} %{time_in_force#Time_in_force} as \
        %{participant#Participant}"]
   ;;
@@ -34,7 +36,7 @@ end
 type t =
   { order_id : Order_id.t
   ; client_order_id : Client_order_id.t
-  ; symbol : Symbol.t
+  ; symbol : Symbol_id.t
   ; participant : Participant.t
   ; side : Side.t
   ; price : Price.t

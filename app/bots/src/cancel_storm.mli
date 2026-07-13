@@ -30,7 +30,7 @@ open Jsip_types
 
 module Config : sig
   type t =
-    { symbols : Symbol.t list
+    { symbols : Symbol_id.t list
     (** Symbols the storm operates on. Must be non-empty; each cycle picks
         one uniformly at random from this list using the bot's
         {!Jsip_bot_runtime.Bot_runtime.Context.random} source, so runs stay

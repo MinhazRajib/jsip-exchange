@@ -10,9 +10,13 @@ open Jsip_types
 
 type t [@@deriving sexp_of]
 
-(** Create a matching engine for the given symbols. Each symbol gets its own
-    order book. *)
-val create : Symbol.t list -> t
+(** Create a matching engine trading [num_symbols] symbols, whose ids are [0]
+    through [num_symbols - 1]. Each id gets its own order book.
+
+    The engine deals only in ids; it never sees a symbol's name. Whoever owns
+    the symbol list (the exchange server) assigns the ids, giving the [i]th
+    symbol the id [i]. *)
+val create : num_symbols:int -> t
 
 (** {2 Order submission} *)
 
@@ -26,9 +30,11 @@ val submit : t -> Order.Request.t -> Exchange_event.t list
 
 (** {2 Queries} *)
 
-(** The order book for a given symbol, or [None] if the symbol is not traded
-    on this engine. *)
-val book : t -> Symbol.t -> Order_book.t option
+(** The order book for a symbol id, or [None] if the id names no symbol this
+    engine trades — including an id that is negative or past the end of the
+    symbol list. Ids come off the wire unvalidated, so this is the check that
+    stops a bad one reaching the books array. *)
+val book : t -> Symbol_id.t -> Order_book.t option
 
 (** helpers for client order id *)
 val check_client_order_id

@@ -12,36 +12,16 @@ module Participant_client_order_ids = struct
   include functor Hashable.Make_plain
 end
 
-(* Maps each traded symbol to a small int id and stores its book in a flat
-   array indexed by that id, so a lookup is one hash + O(1) array index
-   instead of O(log n) string compares. Ids are fixed at [create]. *)
-module Symbol_registry = struct
-  type t =
-    { ids : int Symbol.Table.t
-    ; books : Order_book.t array
-    }
-  [@@deriving sexp_of]
+(* One order book per symbol, held in a flat array indexed by the symbol's
+   id. Ids are assigned by whoever owns the symbol list (the exchange server)
+   and are fixed for the engine's lifetime, so the array never resizes and a
+   book lookup is a bounds check plus an array index — no hashing at all.
 
-  let create symbols =
-    let ids = Symbol.Table.create () in
-    let books =
-      List.mapi symbols ~f:(fun id symbol ->
-        Hashtbl.add_exn ids ~key:symbol ~data:id;
-        Order_book.create symbol)
-      |> Array.of_list
-    in
-    { ids; books }
-  ;;
-
-  let book t symbol =
-    match Hashtbl.find t.ids symbol with
-    | None -> None
-    | Some id -> Some t.books.(id)
-  ;;
-end
-
+   Before the id went on the wire, this array was paired with a
+   [Symbol.Table] that hashed the incoming symbol string to its id. Now the
+   client sends the id directly, so that table is gone. *)
 type t =
-  { registry : Symbol_registry.t
+  { books : Order_book.t array
   ; order_id_gen : Order_id.Generator.t
   ; mutable next_fill_id : int
   ; mutable participant_client_order_ids :
@@ -49,8 +29,10 @@ type t =
   }
 [@@deriving sexp_of]
 
-let create symbols =
-  { registry = Symbol_registry.create symbols
+let create ~num_symbols =
+  { books =
+      Array.init num_symbols ~f:(fun i ->
+        Order_book.create (Symbol_id.of_int i))
   ; order_id_gen = Order_id.Generator.create ()
   ; next_fill_id = 1
   ; participant_client_order_ids =
@@ -64,7 +46,15 @@ let check_client_order_id t participant client_order_id =
     ({ participant; client_order_id } : Participant_client_order_ids.t)
 ;;
 
-let book t symbol = Symbol_registry.book t.registry symbol
+(* A symbol id arrives straight off the wire, and [bin_io] deserializes
+   whatever integer it is handed — [Symbol_id.t] being a private int stops us
+   building a bad id in OCaml, but it cannot stop a client sending one. So
+   bounds-check before indexing. An id naming no symbol yields [None], which
+   [submit] and [cancel] already turn into a rejection. *)
+let book t symbol_id =
+  let i = Symbol_id.to_int symbol_id in
+  if i < 0 || i >= Array.length t.books then None else Some t.books.(i)
+;;
 
 (* remove an order *)
 let cancel t participant client_order_id =

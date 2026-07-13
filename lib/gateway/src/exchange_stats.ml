@@ -46,7 +46,7 @@ end
 
 module Book_depth = struct
   type t =
-    { symbol : Symbol.t
+    { symbol : Symbol_id.t
     ; bbo : Bbo.t
     ; total_bid_size : Size.t
     ; total_ask_size : Size.t

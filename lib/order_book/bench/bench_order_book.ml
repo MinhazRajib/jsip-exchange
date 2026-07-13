@@ -41,7 +41,7 @@ open Jsip_order_book
 (* Setup helpers *)
 (* ---------------------------------------------------------------- *)
 
-let aapl = Symbol.of_string "AAPL"
+let aapl = Symbol_id.of_int 0
 let alice = Participant.of_string "Alice"
 let bob = Participant.of_string "Bob"
 
@@ -71,7 +71,7 @@ let book_with_n_asks ?(min_price = 10_000) n =
 
 (** Build a matching engine with [n] resting sells on AAPL. *)
 let engine_with_n_asks ?(min_price = 10_000) n =
-  let engine = Matching_engine.create [ aapl ] in
+  let engine = Matching_engine.create ~num_symbols:1 in
   for i = 1 to n do
     ignore
       (Matching_engine.submit
@@ -328,21 +328,23 @@ let bench_snapshot ~n =
 (* Symbol-lookup benchmark *)
 (* ---------------------------------------------------------------- *)
 
-(** Build an engine trading [n] distinct symbols and return it alongside one
-    present symbol to look up. This exercises the symbol->book lookup, which
-    the single-symbol benchmarks above never touch. *)
+(** Build an engine trading [n] symbols and return it alongside one valid id
+    to look up. This exercises the symbol->book lookup, which the
+    single-symbol benchmarks above never touch.
+
+    The client now sends the symbol id straight over the wire, so the lookup
+    is a bounds check plus an array index — the server hashes nothing. The
+    comparison worth making is against the numbers from before the id went on
+    the wire, when the same lookup first hashed the symbol string. *)
 let engine_with_n_symbols n =
-  let symbols =
-    List.init n ~f:(fun i -> Symbol.of_string [%string "SYM%{i#Int}"])
-  in
-  Matching_engine.create symbols, List.last_exn symbols
+  Matching_engine.create ~num_symbols:n, Symbol_id.of_int (n - 1)
 ;;
 
 let bench_symbol_lookup ~n =
-  let engine, symbol = engine_with_n_symbols n in
+  let engine, symbol_id = engine_with_n_symbols n in
   (* Time only [book] (the pure lookup); submit/cancel would bury it. *)
   Bench.Test.create ~name:[%string "symbol_lookup (n=%{n#Int})"] (fun () ->
-    ignore (Matching_engine.book engine symbol : Order_book.t option))
+    ignore (Matching_engine.book engine symbol_id : Order_book.t option))
 ;;
 
 let symbol_sizes = [ 10; 100; 1_000; 10_000 ]

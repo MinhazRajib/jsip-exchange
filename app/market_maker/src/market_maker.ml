@@ -6,7 +6,7 @@ open Jsip_gateway
 module Config = struct
   type t =
     { participant : Participant.t
-    ; symbol : Symbol.t
+    ; symbol : Symbol_id.t
     ; fair_value_cents : int
     ; half_spread_cents : int
     ; size_per_level : int
@@ -72,7 +72,7 @@ let seed_book (config : Config.t) conn =
 module Resting_order = struct
   type t =
     { client_order_id : Client_order_id.t
-    ; symbol : Symbol.t
+    ; symbol : Symbol_id.t
     ; mutable remaining_size : Size.t
     }
   [@@deriving sexp_of]
@@ -85,7 +85,7 @@ type t =
   ; conn : Rpc.Connection.t
   ; client_order_ids : Client_order_id.Generator.t
   ; resting_orders : Resting_order.t Order_id.Table.t
-  ; inventory : int Symbol.Table.t
+  ; inventory : int Symbol_id.Table.t
   }
 
 (* Our net position in [symbol] moves by [+size] when we buy and [-size] when
@@ -207,7 +207,7 @@ let run (config : Config.t) conn =
     ; conn
     ; client_order_ids = Client_order_id.Generator.create ()
     ; resting_orders = Order_id.Table.create ()
-    ; inventory = Symbol.Table.create ()
+    ; inventory = Symbol_id.Table.create ()
     }
   in
   (* Subscribe to the session feed *before* seeding, so we don't miss the

@@ -8,6 +8,7 @@
 open! Core
 open! Async
 open Jsip_types
+open Jsip_gateway
 open Bonsai_term
 
 (** The bonsai_term app. Pass to [Bonsai_term.start_with_exit]. [events] is
@@ -16,7 +17,8 @@ open Bonsai_term
     drain starts when the Bonsai graph activates and ends when [events] is
     closed. *)
 val app
-  :  events:Exchange_event.t Pipe.Reader.t
+  :  directory:Symbol_directory.t
+  -> events:Exchange_event.t Pipe.Reader.t
   -> exit:(unit -> unit Effect.t)
   -> dimensions:Dimensions.t Bonsai.t
   -> local_ Bonsai.graph

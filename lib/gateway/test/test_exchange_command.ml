@@ -2,6 +2,7 @@ open! Core
 open Jsip_types
 open Jsip_order_book
 open Jsip_gateway
+open Jsip_test_harness
 
 (** Parsing tests with example clients and interactions
 
@@ -9,11 +10,16 @@ open Jsip_gateway
     parsing behavior. Completes a full end to end test between parsing and
     formatting from event_formatter. Specifically regarding BUY/SELL
     commands, no testing for book / subscribe. *)
+let directory = Harness.default_directory
+
 let print_parse line =
-  match Exchange_command.parse line with
+  match Exchange_command.parse line ~directory with
   | Error msg -> print_endline [%string "ERROR: %{Error.to_string_hum msg}"]
   | Ok (Exchange_command.Submit req) ->
-    print_endline [%string "%{req#Order.Request}"]
+    print_endline
+      (Order.Request.to_string
+         ~symbol_to_string:(Symbol_directory.name directory)
+         req)
   | _ -> print_endline "Subscribe / Book was inputted!"
 ;;
 
@@ -138,6 +144,7 @@ let%expect_test "default participant: used when none specified" =
       Exchange_command.parse
         "BUY AAPL 100 150.00"
         ~default_participant:default
+        ~directory
     with
     | Error msg ->
       print_endline [%string "ERROR: %{Error.to_string_hum msg}"]
@@ -157,6 +164,7 @@ let%expect_test "default participant: overridden by explicit 'as'" =
       Exchange_command.parse
         "BUY AAPL 100 150.00 as Alice"
         ~default_participant:default
+        ~directory
     with
     | Error msg ->
       print_endline [%string "ERROR: %{Error.to_string_hum msg}"]
@@ -179,12 +187,14 @@ let%expect_test "round-trip: parse a command, submit, format result" =
     (Harness.sell ~price_cents:15000 ~participant:Harness.bob ());
   (* Parse a buy command from text and submit it *)
   let _ =
-    match Exchange_command.parse "BUY AAPL 100 150.00 as Alice" with
+    match
+      Exchange_command.parse "BUY AAPL 100 150.00 as Alice" ~directory
+    with
     | Error msg ->
       print_endline [%string "ERROR: %{Error.to_string_hum msg}"]
     | Ok (Exchange_command.Submit request) ->
       let events = Matching_engine.submit (Harness.engine t) request in
-      print_endline (Event_formatter.format_events events)
+      print_endline (Event_formatter.format_events ~directory events)
     | Ok _ -> print_endline "WRONG COMMAND"
   in
   [%expect

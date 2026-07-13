@@ -7,7 +7,7 @@ open Jsip_test_harness
     matching-logic tests. *)
 let submit t request =
   let events = Matching_engine.submit (Harness.engine t) request in
-  Harness.print_events ~show:Harness.Show.no_market_data events;
+  Harness.print_events t ~show:Harness.Show.no_market_data events;
   events
 ;;
 
@@ -77,7 +77,7 @@ let%expect_test "partial fill: buy is larger than resting sell" =
     FILL fill_id=1 AAPL $150.00 x60 aggressor=2 (client-id=0) (Alice) BUY resting=1 (client-id=0) (Bob)
     |}];
   (* Remainder rests on the book *)
-  Harness.print_book t Harness.aapl;
+  Harness.print_book t Harness.aapl_id;
   [%expect
     {|
     === AAPL ===
@@ -157,7 +157,7 @@ let%expect_test "IOC: full fill means no cancel event" =
 let%expect_test "IOC: does not rest on book" =
   let t = Harness.create () in
   submit_ t (Harness.buy ~price_cents:15000 ~time_in_force:Ioc ());
-  Harness.print_book t Harness.aapl;
+  Harness.print_book t Harness.aapl_id;
   [%expect
     {|
     ACCEPTED client-id=0 id=1 AAPL BUY 100@$150.00 IOC
@@ -173,13 +173,25 @@ let%expect_test "IOC: does not rest on book" =
 (* Rejections *)
 (* ================================================================ *)
 
-let%expect_test "rejected: unknown symbol" =
+(* Symbol ids arrive over the wire, where [bin_io] will decode any integer it
+   is handed — [Symbol_id.t] being a private int stops us building a bad id
+   in OCaml, but it cannot stop a client sending one. The engine trades three
+   symbols (ids 0, 1, 2), so these two ids name nothing and must be rejected
+   rather than used as an index into the books array. *)
+let%expect_test "rejected: symbol id past the end of the symbol list" =
+  let t = Harness.create () in
+  submit_ t (Harness.buy ~price_cents:15000 ~symbol:(Symbol_id.of_int 99) ());
+  [%expect
+    {| REJECTED client-id=0 99 BUY 100@$150.00 reason=unknown symbol |}]
+;;
+
+let%expect_test "rejected: negative symbol id" =
   let t = Harness.create () in
   submit_
     t
-    (Harness.buy ~price_cents:15000 ~symbol:(Symbol.of_string "NOPE") ());
+    (Harness.buy ~price_cents:15000 ~symbol:(Symbol_id.of_int (-1)) ());
   [%expect
-    {| REJECTED client-id=0 NOPE BUY 100@$150.00 reason=unknown symbol |}]
+    {| REJECTED client-id=0 -1 BUY 100@$150.00 reason=unknown symbol |}]
 ;;
 
 (* ================================================================ *)
@@ -192,13 +204,13 @@ let%expect_test "orders for different symbols don't cross" =
     t
     (Harness.sell
        ~price_cents:15000
-       ~symbol:Harness.aapl
+       ~symbol:Harness.aapl_id
        ~participant:Harness.bob
        ());
-  submit_ t (Harness.buy ~price_cents:15000 ~symbol:Harness.tsla ());
+  submit_ t (Harness.buy ~price_cents:15000 ~symbol:Harness.tsla_id ());
   (* Buy for TSLA should not match the AAPL sell *)
-  Harness.print_book t Harness.aapl;
-  Harness.print_book t Harness.tsla;
+  Harness.print_book t Harness.aapl_id;
+  Harness.print_book t Harness.tsla_id;
   [%expect
     {|
     ACCEPTED client-id=0 id=1 AAPL SELL 100@$150.00 DAY
@@ -220,14 +232,19 @@ let%expect_test "orders for different symbols don't cross" =
 (* Engine queries *)
 (* ================================================================ *)
 
-let%expect_test "book: returns book for known symbol, None for unknown" =
+let%expect_test "book: known id yields a book; out-of-range ids yield None" =
   let t = Harness.create () in
   let engine = Harness.engine t in
   [%test_result: bool]
-    (Option.is_some (Matching_engine.book engine Harness.aapl))
+    (Option.is_some (Matching_engine.book engine Harness.aapl_id))
     ~expect:true;
+  (* The last valid id is 2. Both ends of the range must be checked: an id
+     past the end and a negative one would each index outside the array. *)
   [%test_result: _ option]
-    (Matching_engine.book engine (Symbol.of_string "NOPE"))
+    (Matching_engine.book engine (Symbol_id.of_int 3))
+    ~expect:None;
+  [%test_result: _ option]
+    (Matching_engine.book engine (Symbol_id.of_int (-1)))
     ~expect:None
 ;;
 
@@ -268,7 +285,7 @@ let%expect_test "BBO update emitted when order rests on book" =
          ~price_cents:15000
          ())
   in
-  Harness.print_events ~show:show_bbo events;
+  Harness.print_events t ~show:show_bbo events;
   [%expect {| BBO AAPL bid=$150.00 x100 ask=- |}];
   let events =
     Harness.submit_quiet
@@ -278,7 +295,7 @@ let%expect_test "BBO update emitted when order rests on book" =
          ~price_cents:15100
          ())
   in
-  Harness.print_events ~show:show_bbo events;
+  Harness.print_events t ~show:show_bbo events;
   [%expect {| BBO AAPL bid=$150.00 x100 ask=$151.00 x100 |}]
 ;;
 
@@ -292,7 +309,7 @@ let%expect_test "BBO update: reflects new best after fill" =
          ~price_cents:15000
          ())
   in
-  Harness.print_events ~show:show_bbo events;
+  Harness.print_events t ~show:show_bbo events;
   [%expect {| BBO AAPL bid=- ask=$150.00 x100 |}];
   let events =
     Harness.submit_quiet
@@ -302,7 +319,7 @@ let%expect_test "BBO update: reflects new best after fill" =
          ~price_cents:15000
          ())
   in
-  Harness.print_events ~show:show_bbo events;
+  Harness.print_events t ~show:show_bbo events;
   (* Both sides empty after the cross *)
   [%expect {| BBO AAPL bid=- ask=- |}]
 ;;
@@ -363,6 +380,7 @@ let%expect_test "trade report emitted for each fill" =
          ())
   in
   Harness.print_events
+    t
     ~show:
       (Harness.Show.only (function
         | Exchange_event.Trade_report _ -> true
@@ -379,7 +397,7 @@ let%expect_test "no market data events on rejection" =
   let events =
     Harness.submit_quiet
       t
-      (Harness.buy ~price_cents:15000 ~symbol:(Symbol.of_string "NOPE") ())
+      (Harness.buy ~price_cents:15000 ~symbol:(Symbol_id.of_int 99) ())
   in
   let md_count =
     List.count events ~f:(function
@@ -435,8 +453,8 @@ let%expect_test "scenario: two participants trade, book reflects state" =
        ~size:50
        ~participant:Harness.charlie
        ());
-  Harness.print_book t Harness.aapl;
-  Harness.print_bbo t Harness.aapl;
+  Harness.print_book t Harness.aapl_id;
+  Harness.print_bbo t Harness.aapl_id;
   [%expect
     {|
     ACCEPTED client-id=0 id=1 AAPL BUY 100@$149.90 DAY
@@ -492,7 +510,7 @@ let%expect_test "scenario: aggressive IOC sweeps entire book" =
        ~size:200
        ~time_in_force:Ioc
        ());
-  Harness.print_book t Harness.aapl;
+  Harness.print_book t Harness.aapl_id;
   [%expect
     {|
     ACCEPTED client-id=0 id=1 AAPL SELL 50@$150.00 DAY
@@ -512,19 +530,19 @@ let%expect_test "scenario: aggressive IOC sweeps entire book" =
 
 let%expect_test "scenario: order IDs are globally sequential" =
   let t = Harness.create () in
-  submit_ t (Harness.buy ~price_cents:15000 ~symbol:Harness.aapl ());
+  submit_ t (Harness.buy ~price_cents:15000 ~symbol:Harness.aapl_id ());
   submit_
     t
     (Harness.sell
        ~price_cents:20000
-       ~symbol:Harness.tsla
+       ~symbol:Harness.tsla_id
        ~participant:Harness.bob
        ());
   submit_
     t
     (Harness.buy
        ~price_cents:28000
-       ~symbol:Harness.goog
+       ~symbol:Harness.goog_id
        ~participant:Harness.charlie
        ());
   [%expect
@@ -543,11 +561,11 @@ let%expect_test "scenario: fill IDs are globally sequential" =
     t
     (Harness.sell
        ~price_cents:20000
-       ~symbol:Harness.tsla
+       ~symbol:Harness.tsla_id
        ~participant:Harness.charlie
        ());
   submit_ t (Harness.buy ~price_cents:15000 ());
-  submit_ t (Harness.buy ~price_cents:20000 ~symbol:Harness.tsla ());
+  submit_ t (Harness.buy ~price_cents:20000 ~symbol:Harness.tsla_id ());
   [%expect
     {|
     ACCEPTED client-id=0 id=1 AAPL SELL 100@$150.00 DAY

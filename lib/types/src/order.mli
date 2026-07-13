@@ -12,7 +12,7 @@ open! Core
 module Request : sig
   type t =
     { client_order_id : Client_order_id.t
-    ; symbol : Symbol.t
+    ; symbol : Symbol_id.t
     ; participant : Participant.t
     ; side : Side.t
     ; price : Price.t
@@ -21,7 +21,9 @@ module Request : sig
     }
   [@@deriving sexp, bin_io]
 
-  val to_string : t -> string
+  (** Render the request. The symbol is an id; the caller supplies the
+      resolver that turns it into text. *)
+  val to_string : symbol_to_string:(Symbol_id.t -> string) -> t -> string
 end
 
 (** A live order on the exchange, with an ID assigned by the matching engine
@@ -41,7 +43,7 @@ val create : Request.t -> order_id:Order_id.t -> t
 val client_order_id : t -> Client_order_id.t
 
 val order_id : t -> Order_id.t
-val symbol : t -> Symbol.t
+val symbol : t -> Symbol_id.t
 val participant : t -> Participant.t
 val side : t -> Side.t
 val price : t -> Price.t

@@ -40,10 +40,18 @@ let subscribe_audit_log ~connection ~host ~port =
 
 let main ~host ~port () =
   let%bind connection = connect_to_exchange ~host ~port in
+  (* Events arrive naming symbols by id. Fetch the exchange's name<->id
+     mapping once, up front, so the monitor can render "AAPL" instead of "0"
+     — and so its /substring filter, which searches the rendered line, can
+     match on the name a user actually types. *)
+  let%bind pairs =
+    Rpc.Rpc.dispatch_exn Rpc_protocol.symbol_directory_rpc connection ()
+  in
+  let directory = Symbol_directory.of_alist_exn pairs in
   let%bind events = subscribe_audit_log ~connection ~host ~port in
   let%map result =
     Bonsai_term.start_with_exit (fun ~exit ~dimensions graph ->
-      Term_app.app ~events ~exit ~dimensions graph)
+      Term_app.app ~directory ~events ~exit ~dimensions graph)
   in
   ok_exn result
 ;;

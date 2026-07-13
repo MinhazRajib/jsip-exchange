@@ -16,6 +16,7 @@
 open! Core
 open Jsip_types
 open Jsip_order_book
+open Jsip_gateway
 
 (** {2 Constants}
 
@@ -26,6 +27,18 @@ open Jsip_order_book
 val aapl : Symbol.t
 val tsla : Symbol.t
 val goog : Symbol.t
+
+(** Ids the default symbol list hands out: AAPL=0, TSLA=1, GOOG=2. Order
+    builders take these; [create] takes the names above. *)
+val aapl_id : Symbol_id.t
+
+val tsla_id : Symbol_id.t
+val goog_id : Symbol_id.t
+
+(** The name<->id directory for the default symbol list, for tests that
+    render events without building a harness. *)
+val default_directory : Symbol_directory.t
+
 val alice : Participant.t
 val bob : Participant.t
 val charlie : Participant.t
@@ -43,6 +56,10 @@ val create : ?symbols:Symbol.t list -> unit -> t
 (** The underlying matching engine. *)
 val engine : t -> Matching_engine.t
 
+(** The name<->id directory for this harness's symbols, for tests that need
+    to resolve one to the other themselves. *)
+val directory : t -> Symbol_directory.t
+
 (** {2 Order request builders}
 
     These build [Order.Request.t] values with sensible defaults:
@@ -55,7 +72,7 @@ val buy
   :  price_cents:int
   -> ?size:int
   -> ?client_id:Client_order_id.t
-  -> ?symbol:Symbol.t
+  -> ?symbol:Symbol_id.t
   -> ?participant:Participant.t
   -> ?time_in_force:Time_in_force.t
   -> unit
@@ -65,7 +82,7 @@ val sell
   :  price_cents:int
   -> ?size:int
   -> ?client_id:Client_order_id.t
-  -> ?symbol:Symbol.t
+  -> ?symbol:Symbol_id.t
   -> ?participant:Participant.t
   -> ?time_in_force:Time_in_force.t
   -> unit
@@ -122,13 +139,13 @@ end
 
 (** Print a list of events. By default prints all events; pass [~show] to
     filter. *)
-val print_events : ?show:Show.t -> Exchange_event.t list -> unit
+val print_events : t -> ?show:Show.t -> Exchange_event.t list -> unit
 
 (** Print a single event. *)
-val print_event : Exchange_event.t -> unit
+val print_event : t -> Exchange_event.t -> unit
 
 (** Print the current order book for a symbol. Shows bids, asks, and the BBO. *)
-val print_book : t -> Symbol.t -> unit
+val print_book : t -> Symbol_id.t -> unit
 
 (** Print a concise BBO summary for a symbol. *)
-val print_bbo : t -> Symbol.t -> unit
+val print_bbo : t -> Symbol_id.t -> unit

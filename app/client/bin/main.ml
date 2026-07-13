@@ -19,26 +19,44 @@ let run_client ~host ~port ~participant_name =
   (** login to server and dispatch session feed*)
   let%bind login = Rpc.Rpc.dispatch_exn Rpc_protocol.login_rpc conn participant_name in
   let participant = Or_error.ok_exn login in
+  (* Symbols travel on the wire as ints. Fetch the exchange's name<->id
+     mapping once, up front, so we can turn a name the user types into an id
+     to send, and an id we receive back into a name to show them. The
+     exchange's symbol set is fixed at startup, so this never goes stale. *)
+  let%bind pairs =
+    Rpc.Rpc.dispatch_exn Rpc_protocol.symbol_directory_rpc conn ()
+  in
+  let directory = Symbol_directory.of_alist_exn pairs in
+  let symbols =
+    List.map pairs ~f:(fun (name, _id) -> Symbol.to_string name)
+    |> String.concat ~sep:", "
+  in
   print_endline [%string
       {|
   Connected to exchange at %{host}:%{port#Int} as %{participant#Participant}
-  Commands: BUY|SELL <symbol> <size> <price> [IOC|DAY]
+  Commands: BUY|SELL <client-id> <symbol> <size> <price> [IOC|DAY]
             BOOK <symbol>
             SUBSCRIBE <symbol>  (stream market data)
+            CANCEL <client-id>
 
-  Order acknowledgements, fills, and cancellations are temporarily printed
-  by the server process; the SUBSCRIBE command attaches you to a per-symbol
-  market-data feed.|}];
+  Trading: %{symbols}|}];
   let%bind session_feed, _metadata = (Rpc.Pipe_rpc.dispatch_exn Rpc_protocol.session_feed_rpc conn ()) 
   in
   (** dispatch session feed *)
   don't_wait_for
   (Pipe.iter_without_pushback session_feed ~f:(fun event ->
      match event with 
-    | Fill fill -> (match (Fill.to_participant_view fill participant) with 
-      | Some msg -> print_endline msg
-      | None -> ())
-    | _ -> print_endline (Event_formatter.format_event event)));
+    | Fill fill ->
+      (match
+         Event_formatter.format_fill_for_participant
+           ~directory
+           fill
+           participant
+       with
+       | Some msg -> print_endline msg
+       | None -> ())
+    | _ ->
+      print_endline (Event_formatter.format_event ~directory event)));
   let rec loop () = 
     print_string "> ";
     match%bind Reader.read_line (Lazy.force Reader.stdin) with
@@ -51,7 +69,10 @@ let run_client ~host ~port ~participant_name =
       then loop ()
       else (
         match
-          Exchange_command.parse line ~default_participant:participant
+          Exchange_command.parse
+            line
+            ~default_participant:participant
+            ~directory
         with
         | Error msg ->
           print_endline [%string "ERROR: %{Error.to_string_hum msg}"];
@@ -68,10 +89,11 @@ let run_client ~host ~port ~participant_name =
           let%bind result =
             Rpc.Rpc.dispatch_exn Rpc_protocol.book_query_rpc conn symbol
           in
+          let name = Symbol_directory.name directory symbol in
           (match result with
-           | None ->
-             print_endline [%string "No book available for %{symbol#Symbol}"]
-           | Some result -> print_endline (Book.to_string result));
+           | None -> print_endline [%string "No book available for %{name}"]
+           | Some result ->
+             print_endline (Event_formatter.format_book ~directory result));
           loop ()
         | Ok (Exchange_command.Subscribe symbol) ->
           let%bind result =
@@ -86,17 +108,18 @@ let run_client ~host ~port ~participant_name =
                [%string "ERROR subscribing: %{Error.to_string_hum err}"];
              loop ()
            | Ok (Ok (reader, _id)) ->
+             let name = Symbol_directory.name directory symbol in
              print_endline
                [%string
                  {|
-Subscribed to %{symbol#Symbol} market data. Updates will appear below.
+Subscribed to %{name} market data. Updates will appear below.
 Continue entering commands as normal.|}];
              (* Read market data in the background; the command loop
                 continues running concurrently. *)
              don't_wait_for
                (Pipe.iter_without_pushback reader ~f:(fun event ->
-                  print_endline
-                    [%string "[MD] %{Event_formatter.format_event event}"]));
+                  let e = Event_formatter.format_event ~directory event in
+                  print_endline [%string "[MD] %{e}"]));
              loop ()))
   in
   loop ()

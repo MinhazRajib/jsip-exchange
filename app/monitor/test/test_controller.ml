@@ -1,6 +1,10 @@
 open! Core
 open Jsip_test_harness
 open Jsip_monitor
+open! Jsip_gateway
+
+let directory = Harness.default_directory
+
 module Controller = Controller
 module Key = Bonsai_term.Event.Key
 
@@ -31,7 +35,8 @@ let render_to_string view =
 let show c =
   print_endline
     (render_to_string
-       (Term_app.For_testing.render_display (Controller.display c)))
+       (Term_app.For_testing.render_display
+          (Controller.display ~directory c)))
 ;;
 
 (* ---------- Initial state ---------- *)

@@ -2,7 +2,7 @@ open! Core
 
 type t =
   { fill_id : int
-  ; symbol : Symbol.t
+  ; symbol : Symbol_id.t
   ; price : Price.t
   ; size : Size.t
   ; aggressor_order_id : Order_id.t
@@ -16,6 +16,7 @@ type t =
 [@@deriving sexp, bin_io]
 
 let to_string
+  ~symbol_to_string
   ({ fill_id
    ; symbol
    ; price
@@ -34,7 +35,7 @@ let to_string
     "fill_id=%d %s %s x%d aggressor=%s (client-id=%d) (%s) %s resting=%s \
      (client-id=%d) (%s)"
     fill_id
-    (Symbol.to_string symbol)
+    (symbol_to_string symbol)
     (Price.to_string_dollar price)
     (Size.to_int size)
     (Order_id.to_string aggressor_order_id)
@@ -48,7 +49,7 @@ let to_string
 
 let notional_cents t = Price.to_int_cents t.price * Size.to_int t.size
 
-let to_participant_view t participant =
+let to_participant_view ~symbol_to_string t participant =
   if Participant.( <> ) t.aggressor_participant participant
      && Participant.( <> ) t.resting_participant participant
   then None
@@ -67,13 +68,13 @@ let to_participant_view t participant =
         (sprintf
            "You bought %d %s at %s"
            (Size.to_int t.size)
-           (Symbol.to_string t.symbol)
+           (symbol_to_string t.symbol)
            (Price.to_string_dollar t.price))
     | Sell ->
       Some
         (sprintf
            "You sold %d %s at %s"
            (Size.to_int t.size)
-           (Symbol.to_string t.symbol)
+           (symbol_to_string t.symbol)
            (Price.to_string_dollar t.price)))
 ;;

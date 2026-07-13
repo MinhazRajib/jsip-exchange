@@ -7,7 +7,7 @@
 open! Core
 open Jsip_market_maker.Market_maker
 
-let aapl = Jsip_test_harness.Harness.aapl
+let aapl = Jsip_test_harness.Harness.aapl_id
 let market_maker = Jsip_test_harness.Harness.market_maker
 
 let make_config () : Config.t =
@@ -24,7 +24,7 @@ let%expect_test "config builds and round-trips through sexp" =
   print_s [%sexp (make_config () : Config.t)];
   [%expect
     {|
-    ((participant MarketMaker) (symbol AAPL) (fair_value_cents 15000)
+    ((participant MarketMaker) (symbol 0) (fair_value_cents 15000)
      (half_spread_cents 10) (size_per_level 100) (num_levels 3))
     |}]
 ;;

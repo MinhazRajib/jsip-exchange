@@ -3,44 +3,60 @@ open! Async
 open Jsip_types
 
 type t =
-  { market_data_subscribers_by_symbol :
-      Exchange_event.t Pipe.Writer.t Bag.t Symbol.Table.t
+  { (* One bag of subscribers per symbol, indexed by the symbol's id. The
+       exchange's symbol set is fixed at startup, so this is a plain array —
+       the same shape as the matching engine's array of books, for the same
+       reason. *)
+    market_data_subscribers : Exchange_event.t Pipe.Writer.t Bag.t array
   ; audit_subscribers : Exchange_event.t Pipe.Writer.t Bag.t
   ; registry : Participant_registry.t
   ; participants : Session.t Participant_id.Table.t
   }
 
-let create () =
-  { market_data_subscribers_by_symbol = Symbol.Table.create ()
+let create ~num_symbols =
+  { market_data_subscribers =
+      Array.init num_symbols ~f:(fun (_ : int) -> Bag.create ())
   ; audit_subscribers = Bag.create ()
   ; registry = Participant_registry.create ()
   ; participants = Participant_id.Table.create ()
   }
 ;;
 
-let subscribe_market_data t symbols =
-  let reader, writer = Pipe.create () in
-  (* Register the same writer in every requested symbol's bag. A per-symbol
-     publish iterates a single bag, so a subscriber listed in multiple bags
-     receives each event exactly once — only via whichever bag matches the
-     event's symbol. *)
-  let elts =
-    List.map symbols ~f:(fun symbol ->
-      let subscribers =
-        Hashtbl.find_or_add
-          t.market_data_subscribers_by_symbol
-          ~default:Bag.create
-          symbol
-      in
-      symbol, Bag.add subscribers writer)
-  in
-  don't_wait_for
-    (let%map () = Pipe.closed writer in
-     List.iter elts ~f:(fun (symbol, elt) ->
-       match Hashtbl.find t.market_data_subscribers_by_symbol symbol with
-       | None -> ()
-       | Some subscribers -> Bag.remove subscribers elt));
-  reader
+let is_known_symbol t symbol_id =
+  let i = Symbol_id.to_int symbol_id in
+  i >= 0 && i < Array.length t.market_data_subscribers
+;;
+
+let subscribe_market_data t symbol_ids =
+  (* The ids came off the wire, so check them before using one as an index.
+     Rejecting the whole subscription (rather than quietly dropping the bad
+     ids) means a client that mistypes an id hears about it, and cannot make
+     the server allocate state for symbols that do not exist. *)
+  match List.find symbol_ids ~f:(Fn.non (is_known_symbol t)) with
+  | Some unknown ->
+    Or_error.error_s
+      [%message
+        "subscribe_market_data: unknown symbol id"
+          (unknown : Symbol_id.t)
+          ~num_symbols:(Array.length t.market_data_subscribers : int)]
+  | None ->
+    let reader, writer = Pipe.create () in
+    (* Register the same writer in every requested symbol's bag. A per-symbol
+       publish iterates a single bag, so a subscriber listed in multiple bags
+       receives each event exactly once — only via whichever bag matches the
+       event's symbol. *)
+    let elts =
+      List.map symbol_ids ~f:(fun symbol_id ->
+        let subscribers =
+          t.market_data_subscribers.(Symbol_id.to_int symbol_id)
+        in
+        subscribers, Bag.add subscribers writer)
+    in
+    don't_wait_for
+      (let%map () = Pipe.closed writer in
+       List.iter elts ~f:(fun (subscribers, elt) ->
+         Bag.remove subscribers elt));
+    Ok reader
 ;;
 
 let subscribe_audit t =
@@ -52,12 +68,14 @@ let subscribe_audit t =
   reader
 ;;
 
-let push_market_data t event symbol =
-  match Hashtbl.find t.market_data_subscribers_by_symbol symbol with
-  | None -> ()
-  | Some subscribers ->
-    Bag.iter subscribers ~f:(fun writer ->
-      Pipe.write_without_pushback_if_open writer event)
+(* Events come from the matching engine, which only ever names symbols it
+   trades, so the guard here is belt-and-braces rather than a real check. *)
+let push_market_data t event symbol_id =
+  if is_known_symbol t symbol_id
+  then
+    Bag.iter
+      t.market_data_subscribers.(Symbol_id.to_int symbol_id)
+      ~f:(fun writer -> Pipe.write_without_pushback_if_open writer event)
 ;;
 
 let push_audit t event =

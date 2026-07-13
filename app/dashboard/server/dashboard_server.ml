@@ -15,7 +15,9 @@ type t =
 (* Flatten the exchange's rich snapshot into the primitive, JS-safe wire
    type. [at] is stamped here, on arrival, and is the x-axis of the client's
    charts. *)
-let sample_of_snapshot (snapshot : Jsip_gateway.Exchange_stats.Snapshot.t)
+let sample_of_snapshot
+  ~directory
+  (snapshot : Jsip_gateway.Exchange_stats.Snapshot.t)
   : Protocol.Sample.t
   =
   let at =
@@ -35,7 +37,7 @@ let sample_of_snapshot (snapshot : Jsip_gateway.Exchange_stats.Snapshot.t)
   let book (b : Jsip_gateway.Exchange_stats.Book_depth.t)
     : Protocol.Book_row.t
     =
-    { symbol = Symbol.to_string b.symbol
+    { symbol = Jsip_gateway.Symbol_directory.name directory b.symbol
     ; bid = Bbo.price b.bbo Buy |> Option.map ~f:price_string
     ; ask = Bbo.price b.bbo Sell |> Option.map ~f:price_string
     ; total_bid_size = Size.to_int b.total_bid_size
@@ -58,8 +60,8 @@ let sample_of_snapshot (snapshot : Jsip_gateway.Exchange_stats.Snapshot.t)
   }
 ;;
 
-let record t snapshot =
-  Queue.enqueue t.samples (sample_of_snapshot snapshot);
+let record ~directory t snapshot =
+  Queue.enqueue t.samples (sample_of_snapshot ~directory snapshot);
   while Queue.length t.samples > buffer_size do
     ignore (Queue.dequeue_exn t.samples : Protocol.Sample.t)
   done
@@ -234,10 +236,21 @@ let start ~exchange_host ~exchange_port ~http_port ~js_bundle_path () =
   let%bind connection =
     connect_to_exchange ~host:exchange_host ~port:exchange_port
   in
+  (* The stats feed names each book by symbol id. The dashboard is a client
+     of the exchange like any other, so it fetches the directory to put names
+     back on the rows the browser shows. *)
+  let%bind pairs =
+    Rpc.Rpc.dispatch_exn
+      Jsip_gateway.Rpc_protocol.symbol_directory_rpc
+      connection
+      ()
+  in
+  let directory = Jsip_gateway.Symbol_directory.of_alist_exn pairs in
   let%bind pipe =
     subscribe_stats ~connection ~host:exchange_host ~port:exchange_port
   in
-  don't_wait_for (Pipe.iter_without_pushback pipe ~f:(fun s -> record t s));
+  don't_wait_for
+    (Pipe.iter_without_pushback pipe ~f:(fun s -> record ~directory t s));
   let%bind (_ : (Socket.Address.Inet.t, int) Cohttp_async.Server.t) =
     Rpc_websocket.Rpc.serve
       ~where_to_listen:(Tcp.Where_to_listen.of_port http_port)

@@ -151,13 +151,21 @@ let start_stats_loop ~engine ~stats ~symbols =
 ;;
 
 let start ~symbols ~port () =
-  let engine = Matching_engine.create symbols in
-  let dispatcher = Dispatcher.create () in
+  (* The symbol list is the authoritative name->id mapping: the [i]th symbol
+     gets id [i]. Everything downstream of here — the engine, the dispatcher,
+     the wire — deals in ids only. *)
+  let num_symbols = List.length symbols in
+  let symbol_ids = List.init num_symbols ~f:Symbol_id.of_int in
+  (* The authoritative name<->id mapping. The server only ever serves this;
+     it never looks a name up itself, because it never renders a symbol. *)
+  let directory = Symbol_directory.of_symbols symbols in
+  let engine = Matching_engine.create ~num_symbols in
+  let dispatcher = Dispatcher.create ~num_symbols in
   let stats = Exchange_stats.create () in
   let request_reader, request_writer = Pipe.create () in
   Pipe.set_size_budget request_writer request_queue_size_budget;
   start_matching_loop ~engine ~dispatcher ~stats request_reader;
-  start_stats_loop ~engine ~stats ~symbols;
+  start_stats_loop ~engine ~stats ~symbols:symbol_ids;
   let implementations =
     Rpc.Implementations.create_exn
       ~implementations:
@@ -203,6 +211,11 @@ let start ~symbols ~port () =
                  handle_write
                    ~request_writer
                    (Order { request with participant }))
+        ; Rpc.Rpc.implement'
+            Rpc_protocol.symbol_directory_rpc
+            (fun state () ->
+               ignore state;
+               Symbol_directory.to_alist directory)
         ; Rpc.Rpc.implement' Rpc_protocol.book_query_rpc (fun state symbol ->
             ignore state;
             Matching_engine.book engine symbol
@@ -221,12 +234,10 @@ let start ~symbols ~port () =
                    (Cancel { participant; client_order_id }))
         ; Rpc.Pipe_rpc.implement
             Rpc_protocol.market_data_rpc
-            (fun state symbols ->
+            (fun state symbol_ids ->
                ignore state;
-               let reader =
-                 Dispatcher.subscribe_market_data dispatcher symbols
-               in
-               return (Ok reader))
+               return
+                 (Dispatcher.subscribe_market_data dispatcher symbol_ids))
         ; Rpc.Pipe_rpc.implement Rpc_protocol.audit_log_rpc (fun state () ->
             ignore state;
             let reader = Dispatcher.subscribe_audit dispatcher in

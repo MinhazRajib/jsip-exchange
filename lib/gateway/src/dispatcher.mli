@@ -2,9 +2,10 @@
 
     Owns subscription registries:
 
-    - **Market-data subscribers**, keyed by [Symbol.t]. Each subscriber gets
-      a pipe of [Best_bid_offer_update] and [Trade_report] events for the
-      symbol they asked about. This is the public market-data feed.
+    - **Market-data subscribers**, held in an array indexed by [Symbol_id.t].
+      Each subscriber gets a pipe of [Best_bid_offer_update] and
+      [Trade_report] events for the symbol they asked about. This is the
+      public market-data feed.
 
     - **Audit subscribers**, an unfiltered firehose of every event the
       matching engine produces. Intended for the exchange operator's monitor;
@@ -19,23 +20,26 @@ open Jsip_types
 
 type t
 
-(** Create a dispatcher.
+(** Create a dispatcher for an exchange trading [num_symbols] symbols, whose
+    ids are [0] through [num_symbols - 1]. The count is fixed here because
+    market-data subscribers live in an array indexed by symbol id. *)
+val create : num_symbols:int -> t
 
-    Events whose audience is a single participant (order-lifecycle responses
-    and [Fill] events) are currently handed to a stub [push_to_session] that
-    prints them on stdout, prefixed with the target participant. Wiring this
-    up to real [Session] outbound pipes is a week-2 exercise. *)
-val create : unit -> t
-
-(** Subscribe to public market data for one or more [symbols]. The same pipe
+(** Subscribe to public market data for one or more symbol ids. The same pipe
     receives events for every requested symbol; the dispatcher avoids
     duplicates so a subscriber listed against multiple symbols only sees each
     event once. The pipe is removed from the dispatcher when its reader is
-    closed. *)
+    closed.
+
+    Returns an error, and subscribes to nothing, if any requested id names no
+    symbol this exchange trades. Ids arrive over the wire, so they cannot be
+    trusted: rejecting outright stops a client from mistyping an id and
+    silently hearing nothing, and stops it from making the server hold state
+    for symbols that do not exist. *)
 val subscribe_market_data
   :  t
-  -> Symbol.t list
-  -> Exchange_event.t Pipe.Reader.t
+  -> Symbol_id.t list
+  -> Exchange_event.t Pipe.Reader.t Or_error.t
 
 (** Subscribe to the full unfiltered event firehose. Intended for the monitor
     / admin tools. *)
